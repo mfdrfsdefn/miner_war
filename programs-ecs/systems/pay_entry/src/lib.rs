@@ -1,0 +1,125 @@
+use bolt_lang::*;
+use player::Player;
+use prizepool::Prizepool;
+use anchor_spl::token::{TokenAccount, Transfer};
+use solana_program::{
+    account_info::AccountInfo, 
+    program::invoke_signed, 
+    pubkey::Pubkey, 
+    system_instruction, 
+    sysvar::{rent::Rent, Sysvar}
+};
+declare_id!("CLC46PuyXnSuZGmUrqkFbAh7WwzQm8aBPjSQ3HMP56kp");
+#[error_code]
+pub enum SupersizeError {
+    #[msg("Player already in game.")]
+    AlreadyInGame,
+    #[msg("Invalid game vault.")]
+    InvalidGameVault,
+    #[msg("Invalid game vault owner.")]
+    InvalidGameVaultOwner,
+    #[msg("Token mint mismatch.")]
+    InvalidMint,
+    #[msg("Token decimals not set.")]
+    MissingTokenDecimals,
+    #[msg("Player component doesn't belong to map.")]
+    MapKeyMismatch,
+    #[msg("Given buddy link member account not valid.")]
+    InvalidMember,
+    #[msg("Given referrer-subsidize account not valid.")]
+    InvalidReferrer,
+    #[msg("Invalid referral vault owner.")]
+    InvalidReferralVaultOwner,
+}
+
+
+
+#[system]
+pub mod pay_entry {
+    
+    pub fn execute(ctx: Context<Components>, args: Args) -> Result<Components> {
+        const FIXED_BUY_IN: f64 = 100.0; // 固定买入金额
+        
+        require!(ctx.accounts.prizepool.map == ctx.accounts.player.map, SupersizeError::MapKeyMismatch);
+        require!(ctx.accounts.player.mine_amount == 0, SupersizeError::AlreadyInGame);
+        require!(ctx.accounts.player.authority.is_none(), SupersizeError::AlreadyInGame);
+        require!(
+            ctx.accounts.prizepool.vault_token.expect("Vault token account not set") == ctx.vault_token_account()?.key(),
+            SupersizeError::InvalidGameVault
+        );
+
+        let vault_token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
+            &mut (ctx.vault_token_account()?.to_account_info().data.borrow()).as_ref()
+        )?;
+
+        let exit_pid: Pubkey = pubkey!("BAP315i1xoAXqbJcTT1LrUS45N3tAQnNnPuNQkCcvbAr"); 
+        let map_pubkey = ctx.accounts.prizepool.map.expect("Prizepool map key not set");
+        let token_account_owner_pda_seeds = &[b"token_account_owner_pda", map_pubkey.as_ref()];
+        let (derived_token_account_owner_pda, _bump) = Pubkey::find_program_address(token_account_owner_pda_seeds, &exit_pid);
+        require!(
+            derived_token_account_owner_pda == vault_token_account.owner,
+            SupersizeError::InvalidGameVaultOwner
+        );
+        require!(
+            vault_token_account.mint == ctx.accounts.prizepool.vault_token.expect("Vault mint not set"),
+            SupersizeError::InvalidMint
+        );
+
+        let decimals = 9; // 使用固定的代币精度
+        let wallet_balance = vault_token_account.amount / 10_u64.pow(decimals);
+        let player_payout_account = Some(ctx.payout_token_account()?.key());
+
+        let transfer_instruction = Transfer {
+            from: ctx.payout_token_account()?.to_account_info(),
+            to: ctx.vault_token_account()?.to_account_info(),
+            authority: ctx.signer()?.to_account_info(),
+        };
+    
+        let cpi_ctx = CpiContext::new(
+            ctx.token_program()?.to_account_info(),
+            transfer_instruction,
+        );
+        let scale_factor = 10_u64.pow(decimals);
+        let transfer_amount = (FIXED_BUY_IN * scale_factor as f64).round() as u64;
+        anchor_spl::token::transfer(cpi_ctx, transfer_amount)?;
+
+        let player_authority = Some(ctx.player_account()?.key());
+        let player = &mut ctx.accounts.player;
+        
+        player.authority = player_authority;
+        player.reward_account = player_payout_account;
+        //player.buy_in = FIXED_BUY_IN;
+        //player.current_game_wallet_balance = wallet_balance as f64;
+        //player.join_time = Clock::get()?.unix_timestamp;
+
+        Ok(ctx.accounts)
+    }
+    #[system_input]
+pub struct Components {
+    pub player: Player,
+    pub prizepool: Prizepool,
+}
+#[arguments]
+struct Args {
+    buyin: f64,
+    member_name: Option<String>,
+}
+#[extra_accounts]
+pub struct ExtraAccounts {
+    #[account(mut)]
+    vault_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    player_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    payout_token_account: Account<'info, TokenAccount>,
+    #[account(mut)]
+    signer: Signer<'info>,
+    system_program: Program<'info, System>,
+    token_program: Program<'info, Token>,
+    rent: Sysvar<'info, Rent>,
+}
+
+}
+
+
+
