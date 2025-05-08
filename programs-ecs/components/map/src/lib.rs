@@ -9,6 +9,8 @@ pub struct Map {
     pub mine_remain: u64,
     pub total_machine_amount: u64,
     pub real_mining_speed: u64,
+    pub authority: Option<Pubkey>,
+    pub buy_in:f64,
 }
 
 impl Default for Map {
@@ -17,6 +19,8 @@ impl Default for Map {
             mine_remain: 0,
             total_machine_amount: 0,
             real_mining_speed: 0,
+            authority:None,
+            buy_in:100.0,
         })
     }
 }

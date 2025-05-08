@@ -37,14 +37,13 @@ pub enum SupersizeError {
 #[system]
 pub mod pay_entry {
     
-    pub fn execute(ctx: Context<Components>, args: Args) -> Result<Components> {
-        const FIXED_BUY_IN: f64 = 100.0; // 固定买入金额
-        
+    pub fn execute(ctx: Context<Components>, _args: Vec<u8> ) -> Result<Components> {
+        let buy_in: f64 = 100.0; 
         require!(ctx.accounts.prizepool.map == ctx.accounts.player.map, SupersizeError::MapKeyMismatch);
         require!(ctx.accounts.player.mine_amount == 0, SupersizeError::AlreadyInGame);
         require!(ctx.accounts.player.authority.is_none(), SupersizeError::AlreadyInGame);
         require!(
-            ctx.accounts.prizepool.vault_token.expect("Vault token account not set") == ctx.vault_token_account()?.key(),
+            ctx.accounts.prizepool.vault_token_account.expect("Vault token account not set") == ctx.vault_token_account()?.key(),
             SupersizeError::InvalidGameVault
         );
 
@@ -61,13 +60,13 @@ pub mod pay_entry {
             SupersizeError::InvalidGameVaultOwner
         );
         require!(
-            vault_token_account.mint == ctx.accounts.prizepool.vault_token.expect("Vault mint not set"),
+            vault_token_account.mint == ctx.accounts.prizepool.vault_token_account.expect("Vault mint not set"),
             SupersizeError::InvalidMint
         );
 
-        let decimals = 9; // 使用固定的代币精度
+        let decimals = ctx.accounts.prizepool.token_decimals.ok_or(SupersizeError::MissingTokenDecimals)?;
         let wallet_balance = vault_token_account.amount / 10_u64.pow(decimals);
-        let player_payout_account = Some(ctx.payout_token_account()?.key());
+        let player_reward_account = Some(ctx.payout_token_account()?.key());
 
         let transfer_instruction = Transfer {
             from: ctx.payout_token_account()?.to_account_info(),
@@ -80,17 +79,16 @@ pub mod pay_entry {
             transfer_instruction,
         );
         let scale_factor = 10_u64.pow(decimals);
-        let transfer_amount = (FIXED_BUY_IN * scale_factor as f64).round() as u64;
+        let transfer_amount = (buy_in* scale_factor as f64).round() as u64;
         anchor_spl::token::transfer(cpi_ctx, transfer_amount)?;
 
         let player_authority = Some(ctx.player_account()?.key());
         let player = &mut ctx.accounts.player;
         
         player.authority = player_authority;
-        player.reward_account = player_payout_account;
-        //player.buy_in = FIXED_BUY_IN;
-        //player.current_game_wallet_balance = wallet_balance as f64;
-        //player.join_time = Clock::get()?.unix_timestamp;
+        player.reward_account = player_reward_account;
+        player.buy_in =buy_in;
+        player.join_time = Clock::get()?.unix_timestamp;
 
         Ok(ctx.accounts)
     }

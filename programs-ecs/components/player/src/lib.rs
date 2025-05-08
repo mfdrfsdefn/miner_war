@@ -16,6 +16,8 @@ pub struct Player {
     pub weapon_amount: u64,
     pub can_attack: bool,
     pub cool_down: u64, 
+    pub buy_in: f64,
+    pub join_time:i64,
 }
 
 impl Default for Player {
@@ -31,7 +33,8 @@ impl Default for Player {
             weapon_amount: 0,
             can_attack: true,
             cool_down: 0,
-
+            buy_in: 100.0,
+            join_time:0,
 
         })
     }

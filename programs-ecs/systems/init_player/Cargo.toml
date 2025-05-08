@@ -1,0 +1,28 @@
+[package]
+name = "init_player"
+version = "0.2.3"
+description = "Created with Bolt"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "init_player"
+
+[features]
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+default = []
+idl-build = ["bolt-lang/idl-build"]
+anchor-debug = ["bolt-lang/anchor-debug"]
+custom-heap = []
+custom-panic = []
+
+
+[dependencies]
+bolt-lang.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+player = { version = "0.2.3", path = "../../components/player", features = ["cpi"] }
+prizepool = { version = "0.2.3", path = "../../components/prizepool", features = ["cpi"] }
+map = { version = "0.2.3", path = "../../components/map", features = ["cpi"] }

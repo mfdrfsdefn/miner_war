@@ -996,6 +996,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "init_map"
+version = "0.2.3"
+dependencies = [
+ "bolt-lang",
+ "serde",
+]
+
+[[package]]
+name = "init_player"
+version = "0.2.3"
+dependencies = [
+ "bolt-lang",
+ "map",
+ "player",
+ "prizepool",
+ "serde",
+]
+
+[[package]]
+name = "init_prizepool"
+version = "0.2.3"
+dependencies = [
+ "bolt-lang",
+ "map",
+ "player",
+ "prizepool",
+ "serde",
+]
+
+[[package]]
 name = "inout"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
