@@ -1,12 +1,12 @@
 [package]
-name = "mine"
+name = "battle"
 version = "0.2.3"
 description = "Created with Bolt"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "mine"
+name = "battle"
 
 [features]
 no-entrypoint = []
