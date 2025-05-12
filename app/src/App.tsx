@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { Button } from '@/components/ui/button'
-import { AccountInfo, Connection, PublicKey, sendAndConfirmTransaction, Transaction } from '@solana/web3.js'
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { AddEntity, CreateSession, InitializeNewWorld, Provider, Session, Program, InitializeComponent, ApplySystem, anchor, FindComponentPda } from '@magicblock-labs/bolt-sdk';
+import { PublicKey, Signer, Transaction } from '@solana/web3.js'
+import { useAnchorWallet, useConnection, useWallet } from '@solana/wallet-adapter-react';
+import { AddEntity, CreateSession, InitializeNewWorld, Session, Program, InitializeComponent, ApplySystem, anchor, FindComponentPda } from '@magicblock-labs/bolt-sdk';
 import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
 
 // import positionComponentIdl from "../../../target/idl/position.json";
@@ -11,113 +11,176 @@ import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
 
 // import { Position } from '../../../target/types/position';
 // import { Movement } from '../../../target/types/movement';
+import { AnchorProvider, BN, Wallet, web3 } from '@coral-xyz/anchor';
+import { cn } from './lib/utils';
 
 const WORLD_PDA = new PublicKey("7vdDgJqnEFwxDXER3eHmLQPu9sm3kSoHtFCC2JsLa68P");
 
-export class SimpleProvider implements Provider {
-  readonly connection: Connection;
-  readonly publicKey?: PublicKey;
-
-  constructor(connection: Connection, publicKey?: PublicKey) {
-    this.connection = connection;
-    this.publicKey = publicKey;
-  }
-}
-
 function App() {
-  const [count, setCount] = useState(0);
   const { connection } = useConnection();
   const { publicKey, sendTransaction } = useWallet();
-  const provider = new SimpleProvider(connection, publicKey!);
+  const wallet = useAnchorWallet();
+  const provider = useMemo(() => new AnchorProvider(connection as unknown as web3.Connection, wallet as Wallet), [connection, wallet]);
   anchor.setProvider(provider);
-  const entityPdaRef = useRef<PublicKey | null>(null);
+  // const entityPdaRef = useRef<PublicKey | null>(null);
+  // const session = useRef<Session | null>(null);
 
-  // const positionComponent = new Program(positionComponentIdl as Position, provider);
-  // const movementSystem = new Program(movementSystemIdl as Movement, provider);
+  // const positionComponent: Program<Position> = useMemo(() => new Program(positionComponentIdl, provider), [provider]);
+  // const movementSystem: Program<Movement> = useMemo(() => new Program(movementSystemIdl, provider), [provider]);
 
-  const getWorldPda = useCallback(async () => {
-    if (!publicKey) throw new WalletNotConnectedError();
-    const { context: { slot: minContextSlot }, value: { blockhash, lastValidBlockHeight } } = await connection.getLatestBlockhashAndContext();
-    const initNewWorld = await InitializeNewWorld({ payer: publicKey, connection });
-    const worldPda = initNewWorld.worldPda;
-    // 发送阶段
-    const signature = await sendTransaction(initNewWorld.transaction, connection, { minContextSlot });
-    // 确认阶段（关键！）
-    await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature, }, "confirmed");
-    console.log(`Initialized a new world (ID=${worldPda}). Initialization signature: ${signature}`);
-    return worldPda;
-  }, [publicKey, connection, sendTransaction]);
 
-  const createGame = useCallback(async () => {
-    if (!publicKey) throw new WalletNotConnectedError();
+  // const submitTransaction = useCallback(async (transaction: Transaction): Promise<string | null> => {
+  //   const {
+  //     context: { slot: minContextSlot },
+  //     value: { blockhash, lastValidBlockHeight }
+  //   } = await connection.getLatestBlockhashAndContext();
+  //   let signature = null;
 
-    // get world pda
-    const worldPda = WORLD_PDA //await getWorldPda();
-    console.log("worldPda", worldPda.toBase58());
+  //   if (session.current) {
+  //     signature = await connection.sendTransaction(transaction, [session.current.signer as Signer], { minContextSlot });
+  //   } else {
+  //     signature = await sendTransaction(transaction, connection, { minContextSlot })
+  //   }
 
-    // create entity
-    const addEntity = await AddEntity({ payer: publicKey, world: worldPda, connection });
-    entityPdaRef.current = addEntity.entityPda;
-    console.log("entityPda", addEntity.entityPda.toBase58());
+  //   await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature }, 'confirmed');
 
-    // // add position component to entity
-    // const initPositionComponent = await InitializeComponent({
-    //   payer: publicKey,
-    //   entity: addEntity.entityPda,
-    //   componentId: positionComponent.programId
-    // });
+  //   // Transaction was successful
+  //   return signature;
+  // }, [connection, sendTransaction]);
 
-    // // movement system
-    // const applyMovementSystem = await ApplySystem({
-    //   authority: publicKey,
-    //   systemId: movementSystem.programId,
-    //   world: worldPda,
-    //   entities: [{
-    //     entity: addEntity.entityPda,
-    //     components: [{ componentId: positionComponent.programId }],
-    //   }]
-    // });
+  // const getWorldPda = useCallback(async (): Promise<PublicKey> => {
+  //   if (!publicKey) throw new WalletNotConnectedError();
+  //   const initNewWorld = await InitializeNewWorld({ payer: publicKey, connection });
+  //   const worldPda = initNewWorld.worldPda;
+  //   const signature = await submitTransaction(initNewWorld.transaction);
+  //   console.log(`Initialized a new world (ID=${worldPda}). Initialization signature: ${signature}`);
+  //   return worldPda;
+  // }, [connection, publicKey, submitTransaction]);
 
-    // // add both instruction to one transaction
-    // const transaction = new Transaction().add(
-    //   addEntity.instruction,
-    //   initPositionComponent.instruction,
-    //   applyMovementSystem.instruction
-    // );
+  // const createSession = useCallback(
+  //   async () => {
+  //     const create_session = await CreateSession({
+  //       authority: publicKey as PublicKey,
+  //       topUp: new BN(100000000)
+  //     });
+  //     const blockhash = await connection.getLatestBlockhash();
+  //     create_session.transaction.recentBlockhash = blockhash.blockhash;
+  //     try {
+  //       create_session.transaction.feePayer = publicKey as PublicKey;
+  //       create_session.transaction.partialSign(create_session.session.signer as Signer);
+  //     } catch (error) {
+  //       console.log("Failed to sign transaction", error);
+  //     }
 
-    // // send transaction    
-    // const signature = await sendTransaction(transaction, connection);
-    // await connection.confirmTransaction(signature);
-    // console.log("🚀 ~ createGame ~ result:", signature);
+  //     const signature = await submitTransaction(create_session.transaction)
+  //     session.current = create_session.session;
+  //     if (signature == null) {
+  //       throw new Error("Failed to create session");
+  //     }
+  //   },
+  //   [connection, publicKey, submitTransaction],
+  // )
 
-  }, [publicKey, connection, sendTransaction, /*movementSystem.programId, positionComponent.programId*/]);
 
-  // useEffect(() => {
+  // const subscribPosition = useCallback(() => {
+  //   if (!entityPdaRef.current) return;
+  //   console.log("subscribing to events");
+  //   const positionComponentPda = FindComponentPda({ componentId: positionComponent.programId, entity: entityPdaRef.current! });
+  //   connection.onAccountChange(positionComponentPda, (updatedAccountInfo) => {
+  //     console.log("Updated account info: ", updatedAccountInfo)
+  //     const parsedData: {
+  //       x: anchor.BN;
+  //       y: anchor.BN;
+  //       z: anchor.BN;
+  //       description: string;
+  //       boltMetadata: {
+  //         authority: anchor.web3.PublicKey;
+  //       };
+  //     } = positionComponent.coder.accounts.decode("position", updatedAccountInfo.data);
+  //     console.log("position data: ", parsedData.x.toNumber());
+  //   });
+  //   positionComponent.account.position.fetch(positionComponentPda).then((data) => {
+  //     console.log("position data: ", data.x.toNumber());
+  //   })
+  // }, [connection, positionComponent]);
+
+  // const createGame = useCallback(async () => {
+  //   if (!publicKey) throw new WalletNotConnectedError();
+  //   await createSession();
+  //   // get world pda
+  //   const worldPda = WORLD_PDA // await getWorldPda();
+  //   console.log("worldPda", worldPda.toBase58());
+
+  //   // create entity
+  //   const addEntity = await AddEntity({
+  //     payer: session.current?.signer.publicKey as PublicKey,
+  //     world: worldPda,
+  //     connection
+  //   });
+  //   entityPdaRef.current = addEntity.entityPda;
+  //   console.log("entityPda", addEntity.entityPda.toBase58());
+
+  //   // add position component to entity
+  //   const initPositionComponent = await InitializeComponent({
+  //     payer: session.current?.signer.publicKey as PublicKey,
+  //     entity: addEntity.entityPda,
+  //     componentId: positionComponent.programId
+  //   });
+
+  //   // movement system
+  //   const applyMovementSystem = await ApplySystem({
+  //     authority: session.current?.signer.publicKey as PublicKey,
+  //     systemId: movementSystem.programId,
+  //     world: worldPda,
+  //     session: session.current as Session,
+  //     entities: [{
+  //       entity: addEntity.entityPda,
+  //       components: [{ componentId: positionComponent.programId }],
+  //     }]
+  //   });
+
+  //   // add both instruction to one transaction
+  //   const transaction = new Transaction().add(
+  //     addEntity.instruction,
+  //     initPositionComponent.instruction,
+  //     applyMovementSystem.instruction
+  //   );
+  //   // send transaction    
+  //   const signature = await submitTransaction(transaction);
+  //   console.log("🚀 ~ createGame ~ result:", signature);
+  //   subscribPosition();
+
+  // }, [publicKey, createSession, connection, positionComponent.programId, movementSystem.programId, submitTransaction, subscribPosition]);
+
+
+  // const handlePositionChange = useCallback(async () => {
   //   if (!publicKey) return;
   //   if (!entityPdaRef.current) return;
-  //   const positionSubscription = connection.onAccountChange(positionComponent.programId, (updatedAccountInfo) =>
-  //     console.log("Updated account info: ", updatedAccountInfo),
-  //     "confirmed",
-  //   );
-  //   return () => {
-  //     connection.removeAccountChangeListener(positionSubscription);
-  //   }
-  // }, [connection, publicKey, positionComponent])
+  //   // movement system
+  //   const applyMovementSystem = await ApplySystem({
+  //     authority: session.current?.signer.publicKey as PublicKey,
+  //     systemId: movementSystem.programId,
+  //     world: WORLD_PDA,
+  //     session: session.current as Session,
+  //     entities: [{
+  //       entity: entityPdaRef.current,
+  //       components: [{ componentId: positionComponent.programId }],
+  //     }]
+  //   });
+
+  //   // submitTransaction(applyMovementSystem.transaction);
+  //   const signature = await connection.sendTransaction(applyMovementSystem.transaction, [session.current?.signer as Signer]);
+  //   console.log(signature);
+  // }, [publicKey, movementSystem.programId, positionComponent.programId, connection]);
 
 
   return (
-    <>
-      <div className='w-[1280px] m-auto'>
-        <header className='p-2'>
-          <WalletMultiButton />
-          <Button className='mr-10 ml-1' onClick={() => setCount((count) => count + 1)}>
-            count is {count}
-          </Button>
-          <Button onClick={createGame}>create game</Button>
-        </header>
-        <canvas id='canvas' width={1280} height={720}></canvas>
+    <div className='h-dvh w-dvw relative flex items-center'>
+      <div className="absolute top-4 right-4">
+        <WalletMultiButton />
       </div>
-    </>
+      <div className='w-[1280px] h-[720px] m-auto outline outline-black'></div>
+    </div>
   )
 }
 

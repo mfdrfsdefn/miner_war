@@ -26,9 +26,6 @@ wallet = "~/.config/solana/id.json"
 members = ["programs/*", "programs-ecs/components/*", "programs-ecs/systems/*"]
 
 [scripts]
-_build = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt build"
-_deploy = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt deploy"
-_test = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt test"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [test]
