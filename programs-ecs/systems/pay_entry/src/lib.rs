@@ -1,4 +1,5 @@
 use bolt_lang::*;
+use map::Map;
 use player::Player;
 use prizepool::Prizepool;
 use anchor_spl::token::{TokenAccount, Transfer};
@@ -11,7 +12,7 @@ use solana_program::{
 };
 declare_id!("CLC46PuyXnSuZGmUrqkFbAh7WwzQm8aBPjSQ3HMP56kp");
 #[error_code]
-pub enum SupersizeError {
+pub enum Error {
     #[msg("Player already in game.")]
     AlreadyInGame,
     #[msg("Invalid game vault.")]
@@ -39,12 +40,12 @@ pub mod pay_entry {
     
     pub fn execute(ctx: Context<Components>, _args: Vec<u8> ) -> Result<Components> {
         let buy_in: f64 = 100.0; 
-        require!(ctx.accounts.prizepool.map == ctx.accounts.player.map, SupersizeError::MapKeyMismatch);
-        require!(ctx.accounts.player.mine_amount == 0, SupersizeError::AlreadyInGame);
-        require!(ctx.accounts.player.authority.is_none(), SupersizeError::AlreadyInGame);
+        require!(ctx.accounts.prizepool.map == ctx.accounts.player.map, Error::MapKeyMismatch);
+        require!(ctx.accounts.player.mine_amount == 0, Error::AlreadyInGame);
+        require!(ctx.accounts.player.authority.is_none(), Error::AlreadyInGame);
         require!(
             ctx.accounts.prizepool.vault_token_account.expect("Vault token account not set") == ctx.vault_token_account()?.key(),
-            SupersizeError::InvalidGameVault
+            Error::InvalidGameVault
         );
 
         let vault_token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
@@ -57,14 +58,14 @@ pub mod pay_entry {
         let (derived_token_account_owner_pda, _bump) = Pubkey::find_program_address(token_account_owner_pda_seeds, &exit_pid);
         require!(
             derived_token_account_owner_pda == vault_token_account.owner,
-            SupersizeError::InvalidGameVaultOwner
+            Error::InvalidGameVaultOwner
         );
         require!(
             vault_token_account.mint == ctx.accounts.prizepool.vault_token_account.expect("Vault mint not set"),
-            SupersizeError::InvalidMint
+            Error::InvalidMint
         );
 
-        let decimals = ctx.accounts.prizepool.token_decimals.ok_or(SupersizeError::MissingTokenDecimals)?;
+        let decimals = ctx.accounts.prizepool.token_decimals.ok_or(Error::MissingTokenDecimals)?;
         let wallet_balance = vault_token_account.amount / 10_u64.pow(decimals);
         let player_reward_account = Some(ctx.payout_token_account()?.key());
 
@@ -89,19 +90,17 @@ pub mod pay_entry {
         player.reward_account = player_reward_account;
         player.buy_in =buy_in;
         player.join_time = Clock::get()?.unix_timestamp;
-
+        player.current_game_wallet_balance = wallet_balance as f64;
         Ok(ctx.accounts)
     }
     #[system_input]
 pub struct Components {
-    pub player: Player,
+    pub map: Map,
     pub prizepool: Prizepool,
+    pub player: Player,
 }
-#[arguments]
-struct Args {
-    buyin: f64,
-    member_name: Option<String>,
-}
+
+
 #[extra_accounts]
 pub struct ExtraAccounts {
     #[account(mut)]
