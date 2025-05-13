@@ -1,27 +1,34 @@
-import { useCallback, useMemo, useRef } from 'react'
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
-import { Button } from '@/components/ui/button'
-import { PublicKey, Signer, Transaction } from '@solana/web3.js'
-import { useAnchorWallet, useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { AddEntity, CreateSession, InitializeNewWorld, Session, Program, InitializeComponent, ApplySystem, anchor, FindComponentPda } from '@magicblock-labs/bolt-sdk';
-import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
+import { CreateGame } from './components/CreateGame';
+import { useSession } from './hooks/useSession';
+import { useCallback, useEffect, useState } from 'react';
+import { PublicKey, type Signer } from '@solana/web3.js';
 
-// import positionComponentIdl from "../../../target/idl/position.json";
-// import movementSystemIdl from "../../../target/idl/movement.json";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  // TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Button } from './components/ui/button';
 
-// import { Position } from '../../../target/types/position';
-// import { Movement } from '../../../target/types/movement';
-import { AnchorProvider, BN, Wallet, web3 } from '@coral-xyz/anchor';
-import { cn } from './lib/utils';
-
-const WORLD_PDA = new PublicKey("7vdDgJqnEFwxDXER3eHmLQPu9sm3kSoHtFCC2JsLa68P");
-
+interface Game {
+  id: number;
+  name: string;
+  status: string;
+  owner: string;
+  loading: boolean;
+}
 function App() {
-  const { connection } = useConnection();
-  const { publicKey, sendTransaction } = useWallet();
-  const wallet = useAnchorWallet();
-  const provider = useMemo(() => new AnchorProvider(connection as unknown as web3.Connection, wallet as Wallet), [connection, wallet]);
-  anchor.setProvider(provider);
+  const { publicKey, connection, minerWarProgram, playerKey, session, createSession } = useSession();
+  const [list, setList] = useState<Game[]>([]);
+  const [loading, setLoading] = useState(false);
+
+
   // const entityPdaRef = useRef<PublicKey | null>(null);
   // const session = useRef<Session | null>(null);
 
@@ -173,13 +180,87 @@ function App() {
   //   console.log(signature);
   // }, [publicKey, movementSystem.programId, positionComponent.programId, connection]);
 
+  // useEffect(() => {
+  //   if (!publicKey) return;
+  //   connection.onAccountChange(publicKey, (accountInfo) => {
+  //     console.log("~ accountInfo:", accountInfo);
+  //   })
+  // }, [connection, publicKey]);
+
+  const getGames = useCallback(async () => {
+    const [gamesPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("games")],
+      minerWarProgram.programId
+    );
+    minerWarProgram.account.games.fetch(gamesPda).then(games => {
+      const data = games.list.map(game => ({
+        id: game.id,
+        name: game.name,
+        status: game.status.created ? "created" : "started",
+        owner: game.owner.toBase58(),
+        loading: false,
+      }));
+      setList(data);
+    });
+  }, [minerWarProgram]);
+
+  const handleClick = useCallback(async (id: number) => {
+    setList(list => list.map(item => item.id === id ? { ...item, loading: true, } : item));
+    await createSession();
+    const [gamesPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("games")],
+      minerWarProgram.programId
+    );
+    const tx = await minerWarProgram.methods
+      .removeGame(id)
+      .accounts({ payer: playerKey, games: gamesPda })
+      .transaction();
+    const sn = await connection.sendTransaction(tx, [session.current?.signer as Signer]);
+    await connection.confirmTransaction(sn, "confirmed");
+    await getGames();
+  }, [createSession, minerWarProgram, playerKey, connection, session, getGames]);
+
+  useEffect(() => {
+    if (!publicKey) return;
+    getGames()
+  }, [getGames, minerWarProgram, publicKey])
 
   return (
-    <div className='h-dvh w-dvw relative flex items-center'>
+    <div className='h-dvh w-dvw relative flex items-center flex-col justify-center'>
+      <div className="absolute left-4 top-4">
+        <h1 className="text-4xl font-bold font-serif">Miner War</h1>
+      </div>
       <div className="absolute top-4 right-4">
         <WalletMultiButton />
       </div>
-      <div className='w-[1280px] h-[720px] m-auto outline outline-black'></div>
+      {publicKey && <CreateGame getGames={getGames} />}
+      <Table className='max-w-[1000px] m-auto'>
+        <TableCaption>Game List</TableCaption>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-[80px]">ID</TableHead>
+            <TableHead>NAME</TableHead>
+            <TableHead>OWNER</TableHead>
+            <TableHead>STATUS</TableHead>
+            <TableHead className="w-[150px] text-right">OPTIONS</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {list.map((game) => (
+            <TableRow key={game.id}>
+              <TableCell className="w-[80px]">{game.id}</TableCell>
+              <TableCell>{game.name}</TableCell>
+              <TableCell>{game.owner}</TableCell>
+              <TableCell>{game.status}</TableCell>
+              <TableCell className="w-[150px] text-right">
+                <Button className='ml-2' size="sm">Join</Button>
+                <Button className='ml-2' onClick={() => handleClick(game.id)} size="sm" variant="destructive" disabled={game.owner !== playerKey.toBase58() || game.loading}>{game.loading ? "Closing" : "Close"}</Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      {/* <div className='w-[1280px] h-[720px] outline outline-black'></div> */}
     </div>
   )
 }

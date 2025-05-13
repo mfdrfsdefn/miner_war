@@ -1,7 +1,7 @@
 use bolt_lang::*;
 use player::Player;
 use map::Map;
-declare_id!("HEqNqfq7WKJu5xa6qjdsMFjWe7bu5qr1L7Cr5ExsPSBL");
+declare_id!("FpiJ4hDruR6oj5Eeawk4kYUKzzRP8nRbVZYwfuSgCtKF");
 #[error_code]
 pub enum Error{
     #[msg("The game has not started yet.")]
