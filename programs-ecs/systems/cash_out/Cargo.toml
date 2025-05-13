@@ -1,12 +1,12 @@
 [package]
-name = "pay_entry"
+name = "cash_out"
 version = "0.2.3"
 description = "Created with Bolt"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "pay_entry"
+name = "cash_out"
 
 [features]
 no-entrypoint = []

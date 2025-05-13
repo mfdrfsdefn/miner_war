@@ -6,6 +6,7 @@ skip-lint = false
 
 [programs.localnet]
 battle = "HEqNqfq7WKJu5xa6qjdsMFjWe7bu5qr1L7Cr5ExsPSBL"
+cash_out = "A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"
 init_map = "McinrqX4S1BFPmvSQvWfwYrLer8e4sQaU2xvaSwpFqb"
 init_player = "GPRFeHp9j5miMk5A5YXCcKBf7eCGAt73UR5Zb4c126ys"
 init_prizepool = "4eHFKWZF3pzDPcnVgBmUQaivbT1WHxUBCcZ5aRUjMUPS"

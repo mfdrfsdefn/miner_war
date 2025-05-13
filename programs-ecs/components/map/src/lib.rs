@@ -14,6 +14,7 @@ pub struct Map {
     pub total_game_time:i64,
     pub game_time: i64,
     pub is_start: bool, 
+    pub mine_amount: u64,
 
 }
 
@@ -30,6 +31,7 @@ impl Default for Map {
             total_game_time:600,
             game_time:0,
             is_start: false,  
+            mine_amount: 0,
         })
     }
 }

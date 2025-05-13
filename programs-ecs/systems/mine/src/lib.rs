@@ -19,7 +19,7 @@ pub mod mine{
         
         ctx.accounts.player1.mine_amount += ctx.accounts.player1.mining_speed * ctx.accounts.map.real_mining_speed;
         ctx.accounts.player2.mine_amount += ctx.accounts.player2.mining_speed * ctx.accounts.map.real_mining_speed;
-        
+        ctx.accounts.map.mine_amount += (ctx.accounts.player1.mining_speed +ctx.accounts.player2.mining_speed )* ctx.accounts.map.real_mining_speed;
         ctx.accounts.map.game_time += 1;
         Ok(ctx.accounts)
     }

@@ -51,8 +51,7 @@ pub mod pay_entry {
         let vault_token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
             &mut (ctx.vault_token_account()?.to_account_info().data.borrow()).as_ref()
         )?;
-
-        let exit_pid: Pubkey = pubkey!("BAP315i1xoAXqbJcTT1LrUS45N3tAQnNnPuNQkCcvbAr"); 
+        let exit_pid: Pubkey = pubkey!("A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"); //cash-out program id
         let map_pubkey = ctx.accounts.prizepool.map.expect("Prizepool map key not set");
         let token_account_owner_pda_seeds = &[b"token_account_owner_pda", map_pubkey.as_ref()];
         let (derived_token_account_owner_pda, _bump) = Pubkey::find_program_address(token_account_owner_pda_seeds, &exit_pid);
@@ -89,8 +88,8 @@ pub mod pay_entry {
         player.authority = player_authority;
         player.reward_account = player_reward_account;
         player.buy_in =buy_in;
-        player.join_time = Clock::get()?.unix_timestamp;
-        player.current_game_wallet_balance = wallet_balance as f64;
+        // player.join_time = Clock::get()?.unix_timestamp;
+        // player.current_game_wallet_balance = wallet_balance as f64;
         Ok(ctx.accounts)
     }
     #[system_input]
