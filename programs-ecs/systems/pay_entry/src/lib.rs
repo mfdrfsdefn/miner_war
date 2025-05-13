@@ -10,7 +10,7 @@ use solana_program::{
     system_instruction, 
     sysvar::{rent::Rent, Sysvar}
 };
-declare_id!("CLC46PuyXnSuZGmUrqkFbAh7WwzQm8aBPjSQ3HMP56kp");
+declare_id!("GQCGW6hJZD7Ar8JPZqnGMKrbe98inGLDfcj3roGUimBd");
 #[error_code]
 pub enum Error {
     #[msg("Player already in game.")]

@@ -1,7 +1,7 @@
 use bolt_lang::*;
 use player::Player;
 use map::Map;
-declare_id!("GPRFeHp9j5miMk5A5YXCcKBf7eCGAt73UR5Zb4c126ys");
+declare_id!("71i58jXe7Hv6yBzMH13gvMP2sLuVZ2AMVJKkgTCS2Fzu");
 
 #[error_code]
 pub enum Error {

@@ -3,7 +3,7 @@ use bolt_lang::*;
 use std::str::FromStr;
 use map::Map;
 use prizepool::Prizepool;
-declare_id!("4eHFKWZF3pzDPcnVgBmUQaivbT1WHxUBCcZ5aRUjMUPS");
+declare_id!("ESGndWFErYWf68ASK75vctW6EvHvWHemHcQSmrjdgCHN");
 
 #[error_code]
 pub enum Error {

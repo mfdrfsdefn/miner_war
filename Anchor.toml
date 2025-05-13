@@ -5,6 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
+<<<<<<< HEAD
 battle = "HEqNqfq7WKJu5xa6qjdsMFjWe7bu5qr1L7Cr5ExsPSBL"
 cash_out = "A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"
 init_map = "McinrqX4S1BFPmvSQvWfwYrLer8e4sQaU2xvaSwpFqb"
@@ -16,21 +17,31 @@ miner_war = "2jMV4AYNBLzygv4SzZyyAVxHqNBDFSvhSd3GYWSrnptY"
 pay_entry = "55ACnfWJWMsJhZzasi5hX5kfhJGymRBWKuk9MKaiooJg"
 player = "7e8EGdmfGvcQYhcdonVLXZsBtqs3ajkk5TbqhwgnJvRy"
 prizepool = "HrY7PavGixzsDPGic6tehAcsa2G7DYew3Q4YsK8BkDFw"
+=======
+battle = "FpiJ4hDruR6oj5Eeawk4kYUKzzRP8nRbVZYwfuSgCtKF"
+init_map = "36K9kUECFsZrnsDeuD49biyHrtwptL48TfCgDf689h7H"
+init_player = "71i58jXe7Hv6yBzMH13gvMP2sLuVZ2AMVJKkgTCS2Fzu"
+init_prizepool = "ESGndWFErYWf68ASK75vctW6EvHvWHemHcQSmrjdgCHN"
+map = "H55UcuGxCmpH1cE6Tsm8EUYVdQz99AHhwBN551jUW8a1"
+mine = "C58xgk3FQsJKnuHwkmzYJWASK1U8NnpBSWA1Bx22rCwD"
+miner_war = "ETspbWudbuMGNh3d5EGK9oEFi1zrHRjy5d7ic4haYAwA"
+pay_entry = "GQCGW6hJZD7Ar8JPZqnGMKrbe98inGLDfcj3roGUimBd"
+player = "714kBkMzu7e4ZNcmVKLBUYjJdo3YBfUQvtWwzucipB7b"
+prizepool = "9vvBKfn1FCcJg4U3zywMqnUXFvaLo5ZMFVWsVUPp5zz5"
+>>>>>>> 41eb9cab61d90567e1b68439d333f94866ffa023
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [workspace]
 members = ["programs/*", "programs-ecs/components/*", "programs-ecs/systems/*"]
 
 [scripts]
-_build = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt build"
-_deploy = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt deploy"
-_test = "RUSTUP_TOOLCHAIN=nightly-2025-04-14 bolt test"
+_test = "bolt test --skip-build --skip-local-validator --skip-deploy"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
 [test]

@@ -1,6 +1,6 @@
 use bolt_lang::*;
 
-declare_id!("HrY7PavGixzsDPGic6tehAcsa2G7DYew3Q4YsK8BkDFw");
+declare_id!("9vvBKfn1FCcJg4U3zywMqnUXFvaLo5ZMFVWsVUPp5zz5");
 
 #[component(delegate)]
 pub struct Prizepool {

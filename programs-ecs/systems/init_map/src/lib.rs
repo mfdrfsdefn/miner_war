@@ -1,6 +1,6 @@
 use bolt_lang::*;
 use map::Map;
-declare_id!("McinrqX4S1BFPmvSQvWfwYrLer8e4sQaU2xvaSwpFqb");
+declare_id!("36K9kUECFsZrnsDeuD49biyHrtwptL48TfCgDf689h7H");
 #[error_code]
 pub enum Error {
     #[msg("Wallet not authorized.")]

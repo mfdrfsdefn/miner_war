@@ -1,16 +1,13 @@
 
-import { FC, ReactNode, useMemo } from "react"
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base"
+import { type FC, type ReactNode } from "react"
 import {
   ConnectionProvider,
   WalletProvider,
 } from "@solana/wallet-adapter-react"
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui"
-import { clusterApiUrl } from "@solana/web3.js"
 
 const WalletContextProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const network = WalletAdapterNetwork.Devnet
-  const endpoint = useMemo(() => clusterApiUrl(network), [network])
+  const endpoint = "https://rpc.magicblock.app/devnet/";
 
   return (
     <ConnectionProvider endpoint={endpoint}>
