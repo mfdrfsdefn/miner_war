@@ -30,8 +30,7 @@ pub enum Error {
     #[msg("Given referrer-subsidize account not valid.")]
     InvalidReferrer,
     #[msg("Invalid referral vault owner.")]
-    InvalidReferralVaultOwner,
-}
+    InvalidReferralVaultOwner,}
 
 
 
@@ -39,7 +38,7 @@ pub enum Error {
 pub mod pay_entry {
     
     pub fn execute(ctx: Context<Components>, _args: Vec<u8> ) -> Result<Components> {
-        let buy_in: f64 = 100.0; 
+        let buy_in: f64 = ctx.accounts.map.buy_in; 
         require!(ctx.accounts.prizepool.map == ctx.accounts.player.map, Error::MapKeyMismatch);
         require!(ctx.accounts.player.mine_amount == 0, Error::AlreadyInGame);
         require!(ctx.accounts.player.authority.is_none(), Error::AlreadyInGame);
@@ -84,12 +83,21 @@ pub mod pay_entry {
 
         let player_authority = Some(ctx.player_account()?.key());
         let player = &mut ctx.accounts.player;
-        
+        let map = &mut ctx.accounts.map;
+        for slot in &mut map.players {
+            if slot.is_none() {
+                *slot = Some(*ctx.accounts.player.key());
+                break;
+            }
+        }   
         player.authority = player_authority;
         player.reward_account = player_reward_account;
         player.buy_in =buy_in;
-        // player.join_time = Clock::get()?.unix_timestamp;
-        // player.current_game_wallet_balance = wallet_balance as f64;
+        player.map = Some(map.key()); 
+        player.mining_speed = 1;
+        player.mine_amount = 0;
+        player.weapon_amount = 0;
+        player.can_attack = true;
         Ok(ctx.accounts)
     }
     #[system_input]
