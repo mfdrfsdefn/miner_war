@@ -3,7 +3,7 @@ use player::Player;
 use map::Map;
 
 
-declare_id!("FTGJG6txDCZJ11veayX9xGeU2W2td8Q8GZxipwGX3DYh");
+declare_id!("3zCTSUK85fC8byoqKDPCN7xdcqy3oBSL7HCeDSnxYnxW");
 
 #[error_code]
 pub enum Error{

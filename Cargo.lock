@@ -956,6 +956,7 @@ name = "game_start"
 version = "0.2.3"
 dependencies = [
  "bolt-lang",
+ "map",
  "serde",
 ]
 

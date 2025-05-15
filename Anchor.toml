@@ -4,14 +4,12 @@
 resolution = true
 skip-lint = false
 
-[programs.devnet]
-buy_machine = "FsbkmSNY6KR7bZu5KJLaKWQPEGxWkYkQDfKTf3HP6xcv"
-buy_weapon = "FTGJG6txDCZJ11veayX9xGeU2W2td8Q8GZxipwGX3DYh"
-game_start = "3SC8YPkniLffERakyrWNQ8VZJ7wZKjzCn6EXJ77VjAS4"
-
 [programs.localnet]
 battle = "FpiJ4hDruR6oj5Eeawk4kYUKzzRP8nRbVZYwfuSgCtKF"
+buy_machine = "GQCYq8WK4sRukXoMT7BEmnwmyfB1mpUr2gVAVYFuuH5e"
+buy_weapon = "3zCTSUK85fC8byoqKDPCN7xdcqy3oBSL7HCeDSnxYnxW"
 cash_out = "5Na7qMLrgu24ACdb5zeGqpzWw2GgZQ2fVS8XxKv3d7r5"
+game_start = "8gWwwXB7re97tRMnh77RXFEFSx5xrRVbgSUADE4r2Z8Y"
 init_map = "36K9kUECFsZrnsDeuD49biyHrtwptL48TfCgDf689h7H"
 init_player = "71i58jXe7Hv6yBzMH13gvMP2sLuVZ2AMVJKkgTCS2Fzu"
 init_prizepool = "ESGndWFErYWf68ASK75vctW6EvHvWHemHcQSmrjdgCHN"
