@@ -4,7 +4,7 @@ use player::Player;
 use prizepool::Prizepool;
 use anchor_spl::token::{TokenAccount, Transfer};
 use std::str::FromStr;
-declare_id!("A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8");
+declare_id!("5Na7qMLrgu24ACdb5zeGqpzWw2GgZQ2fVS8XxKv3d7r5");
 #[error_code]
 pub enum Error {
     #[msg("Not owner of this player.")] NotOwner,
@@ -46,28 +46,29 @@ pub mod cash_out {
         )?;
         let exit_pid: Pubkey = pubkey!("A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"); 
         let map_pubkey = ctx.accounts.prizepool.map;
-        let token_account_owner_pda_seeds = &[b"token_account_owner_pda", map_pubkey.as_ref()];
-        let (derived_token_account_owner_pda, bump) = Pubkey::find_program_address(token_account_owner_pda_seeds, &exit_pid);
-        require!(
-            derived_token_account_owner_pda == ctx.token_account_owner_pda()?.key(),
-            Error::InvalidPda
-        );
-        require!(
-            derived_token_account_owner_pda == vault_token_account.owner,
-            Error::InvalidGameVaultOwner
-        );
+        // let token_account_owner_pda_seeds = &[b"token_account_owner_pda", map_pubkey.as_ref()];
+        // let (derived_token_account_owner_pda, bump) = Pubkey::find_program_address(token_account_owner_pda_seeds, &exit_pid);
+        // require!(
+        //     derived_token_account_owner_pda == ctx.token_account_owner_pda()?.key(),
+        //     Error::InvalidPda
+        // );
+        // require!(
+        //     derived_token_account_owner_pda == vault_token_account.owner,
+        //     Error::InvalidGameVaultOwner
+        // );
         require!(
             vault_token_account.mint == ctx.accounts.prizepool.token.expect("Vault mint not set"),
             Error::InvalidMint
         );
-        let tax_account: Pubkey = pubkey!("56T222W2y6VMP2e6M4twvvzQGi7eLN76bck3kaJCHG9F");
+        // let tax_account: Pubkey = pubkey!("56T222W2y6VMP2e6M4twvvzQGi7eLN76bck3kaJCHG9F");
         let player = &mut ctx.accounts.player;
-        let token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
-            &mut (ctx.token_account()?.to_account_info().data.borrow()).as_ref()
-        )?;
+        // let token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
+        //     &mut (ctx.token_account()?.to_account_info().data.borrow()).as_ref()
+        // )?;
         player.mine_amount = 0;
         player.authority = None;
         player.reward_account = None;
+        Ok(ctx.accounts)
 
     }
 

@@ -5,20 +5,8 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-<<<<<<< HEAD
-battle = "HEqNqfq7WKJu5xa6qjdsMFjWe7bu5qr1L7Cr5ExsPSBL"
-cash_out = "A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"
-init_map = "McinrqX4S1BFPmvSQvWfwYrLer8e4sQaU2xvaSwpFqb"
-init_player = "GPRFeHp9j5miMk5A5YXCcKBf7eCGAt73UR5Zb4c126ys"
-init_prizepool = "4eHFKWZF3pzDPcnVgBmUQaivbT1WHxUBCcZ5aRUjMUPS"
-map = "HHAJcQfjE8YTi8g4aFJot4AMdoWCzHGzFasGC4PZ5mnH"
-mine = "4n8unqB9VVCBKx6nWwJKtU9MSSvm7AooKcF3H3dUkNJz"
-miner_war = "2jMV4AYNBLzygv4SzZyyAVxHqNBDFSvhSd3GYWSrnptY"
-pay_entry = "55ACnfWJWMsJhZzasi5hX5kfhJGymRBWKuk9MKaiooJg"
-player = "7e8EGdmfGvcQYhcdonVLXZsBtqs3ajkk5TbqhwgnJvRy"
-prizepool = "HrY7PavGixzsDPGic6tehAcsa2G7DYew3Q4YsK8BkDFw"
-=======
 battle = "FpiJ4hDruR6oj5Eeawk4kYUKzzRP8nRbVZYwfuSgCtKF"
+cash_out = "5Na7qMLrgu24ACdb5zeGqpzWw2GgZQ2fVS8XxKv3d7r5"
 init_map = "36K9kUECFsZrnsDeuD49biyHrtwptL48TfCgDf689h7H"
 init_player = "71i58jXe7Hv6yBzMH13gvMP2sLuVZ2AMVJKkgTCS2Fzu"
 init_prizepool = "ESGndWFErYWf68ASK75vctW6EvHvWHemHcQSmrjdgCHN"
@@ -28,7 +16,6 @@ miner_war = "ETspbWudbuMGNh3d5EGK9oEFi1zrHRjy5d7ic4haYAwA"
 pay_entry = "GQCGW6hJZD7Ar8JPZqnGMKrbe98inGLDfcj3roGUimBd"
 player = "714kBkMzu7e4ZNcmVKLBUYjJdo3YBfUQvtWwzucipB7b"
 prizepool = "9vvBKfn1FCcJg4U3zywMqnUXFvaLo5ZMFVWsVUPp5zz5"
->>>>>>> 41eb9cab61d90567e1b68439d333f94866ffa023
 
 [registry]
 url = "https://api.apr.dev"

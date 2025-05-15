@@ -1,8 +1,8 @@
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { CreateGame } from './components/CreateGame';
-import { useSession } from './hooks/useSession';
+import { useSessionWallet } from './hooks/useSessionWallet';
 import { useCallback, useEffect, useState } from 'react';
-import { PublicKey, type Signer } from '@solana/web3.js';
+import { PublicKey, Transaction, type Signer } from '@solana/web3.js';
 
 import {
   Table,
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from './components/ui/button';
+import { AddEntity, ApplySystem, BN, FindWorldPda, InitializeComponent, Session } from '@magicblock-labs/bolt-sdk';
 
 interface Game {
   id: number;
@@ -24,175 +25,83 @@ interface Game {
   loading: boolean;
 }
 function App() {
-  const { publicKey, connection, minerWarProgram, playerKey, session, createSession } = useSession();
+  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, mapComponentProgram, initPrizepoolSystemProgram, initMapSystemProgram, initPlayerSystemProgram, playerComponentProgram } = useSessionWallet();
   const [list, setList] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(false);
 
+  const handleGameInit = useCallback(async (worldId: number) => {
+    await createSession();
+    const signer = session.current?.signer as Signer;
 
-  // const entityPdaRef = useRef<PublicKey | null>(null);
-  // const session = useRef<Session | null>(null);
+    const worldPda = FindWorldPda({ worldId: new BN(worldId) });
 
-  // const positionComponent: Program<Position> = useMemo(() => new Program(positionComponentIdl, provider), [provider]);
-  // const movementSystem: Program<Movement> = useMemo(() => new Program(movementSystemIdl, provider), [provider]);
+    const tx = new Transaction();
 
+    // 创建地图实体
+    const mapSeed = new Uint8Array(Buffer.from("map"));
+    const mapEntity = await AddEntity({ payer: playerKey, world: worldPda, seed: mapSeed, connection });
+    const mapComponent = await InitializeComponent({ payer: playerKey, entity: mapEntity.entityPda, componentId: mapComponentProgram.programId });
+    // 初始化地图
+    const initMapSystem = await ApplySystem({
+      authority: signer.publicKey,
+      world: worldPda,
+      systemId: initMapSystemProgram.programId,
+      session: session.current as Session,
+      entities: [{ entity: mapEntity.entityPda, components: [{ componentId: mapComponentProgram.programId }] }],
+      args: { buy_in: 100.0 }
+    });
+    tx.add(mapEntity.transaction, mapComponent.transaction, initMapSystem.transaction);
+    // 玩家
+    ['player1', 'player2'].forEach(async (player) => {
+      const playerSeed = new Uint8Array(Buffer.from(player));
+      const playerEntity = await AddEntity({ payer: playerKey, world: worldPda, seed: playerSeed, connection });
+      const playerComponent = await InitializeComponent({ payer: playerKey, entity: playerEntity.entityPda, componentId: minerWarProgram.programId });
+      const initPlayerSystem = await ApplySystem({
+        authority: playerKey,
+        world: worldPda,
+        systemId: initPlayerSystemProgram.programId,
+        session: session.current as Session,
+        entities: [{
+          entity: playerEntity.entityPda,
+          components: [{ componentId: playerComponentProgram.programId }]
+        }, {
+          entity: mapEntity.entityPda,
+          components: [{ componentId: mapComponentProgram.programId }]
+        }]
+      });
+      tx.add(playerComponent.transaction, initPlayerSystem.transaction);
+    })
 
-  // const submitTransaction = useCallback(async (transaction: Transaction): Promise<string | null> => {
-  //   const {
-  //     context: { slot: minContextSlot },
-  //     value: { blockhash, lastValidBlockHeight }
-  //   } = await connection.getLatestBlockhashAndContext();
-  //   let signature = null;
+    // // 创建奖池实体
+    // const prizepoolSeed = new Uint8Array(Buffer.from("prizepool"));
+    // const prizepoolEntity = await AddEntity({ payer: playerKey, world: worldPda, seed: prizepoolSeed, connection });
+    // const prizepoolComponent = await InitializeComponent({ payer: playerKey, entity: prizepoolEntity.entityPda, componentId: minerWarProgram.programId });
 
-  //   if (session.current) {
-  //     signature = await connection.sendTransaction(transaction, [session.current.signer as Signer], { minContextSlot });
-  //   } else {
-  //     signature = await sendTransaction(transaction, connection, { minContextSlot })
-  //   }
+    // const initPrizepoolSystem = await ApplySystem({
+    //   authority: playerKey,
+    //   world: worldPda,
+    //   systemId: initPrizepoolSystemProgram.programId,
+    //   session: session.current as Session,
+    //   entities: [
+    //     {
+    //       entity: prizepoolEntity.entityPda,
+    //       components: [],
+    //     },
+    //   ],
+    // });
 
-  //   await connection.confirmTransaction({ blockhash, lastValidBlockHeight, signature }, 'confirmed');
+    // tx.add(prizepoolComponent.instruction);
 
-  //   // Transaction was successful
-  //   return signature;
-  // }, [connection, sendTransaction]);
+    const signature1 = await connection.sendTransaction(tx, [signer]);
+    await connection.confirmTransaction(signature1, "confirmed");
 
-  // const getWorldPda = useCallback(async (): Promise<PublicKey> => {
-  //   if (!publicKey) throw new WalletNotConnectedError();
-  //   const initNewWorld = await InitializeNewWorld({ payer: publicKey, connection });
-  //   const worldPda = initNewWorld.worldPda;
-  //   const signature = await submitTransaction(initNewWorld.transaction);
-  //   console.log(`Initialized a new world (ID=${worldPda}). Initialization signature: ${signature}`);
-  //   return worldPda;
-  // }, [connection, publicKey, submitTransaction]);
+    console.log("init map entity", signature1);
 
-  // const createSession = useCallback(
-  //   async () => {
-  //     const create_session = await CreateSession({
-  //       authority: publicKey as PublicKey,
-  //       topUp: new BN(100000000)
-  //     });
-  //     const blockhash = await connection.getLatestBlockhash();
-  //     create_session.transaction.recentBlockhash = blockhash.blockhash;
-  //     try {
-  //       create_session.transaction.feePayer = publicKey as PublicKey;
-  //       create_session.transaction.partialSign(create_session.session.signer as Signer);
-  //     } catch (error) {
-  //       console.log("Failed to sign transaction", error);
-  //     }
-
-  //     const signature = await submitTransaction(create_session.transaction)
-  //     session.current = create_session.session;
-  //     if (signature == null) {
-  //       throw new Error("Failed to create session");
-  //     }
-  //   },
-  //   [connection, publicKey, submitTransaction],
-  // )
-
-
-  // const subscribPosition = useCallback(() => {
-  //   if (!entityPdaRef.current) return;
-  //   console.log("subscribing to events");
-  //   const positionComponentPda = FindComponentPda({ componentId: positionComponent.programId, entity: entityPdaRef.current! });
-  //   connection.onAccountChange(positionComponentPda, (updatedAccountInfo) => {
-  //     console.log("Updated account info: ", updatedAccountInfo)
-  //     const parsedData: {
-  //       x: anchor.BN;
-  //       y: anchor.BN;
-  //       z: anchor.BN;
-  //       description: string;
-  //       boltMetadata: {
-  //         authority: anchor.web3.PublicKey;
-  //       };
-  //     } = positionComponent.coder.accounts.decode("position", updatedAccountInfo.data);
-  //     console.log("position data: ", parsedData.x.toNumber());
-  //   });
-  //   positionComponent.account.position.fetch(positionComponentPda).then((data) => {
-  //     console.log("position data: ", data.x.toNumber());
-  //   })
-  // }, [connection, positionComponent]);
-
-  // const createGame = useCallback(async () => {
-  //   if (!publicKey) throw new WalletNotConnectedError();
-  //   await createSession();
-  //   // get world pda
-  //   const worldPda = WORLD_PDA // await getWorldPda();
-  //   console.log("worldPda", worldPda.toBase58());
-
-  //   // create entity
-  //   const addEntity = await AddEntity({
-  //     payer: session.current?.signer.publicKey as PublicKey,
-  //     world: worldPda,
-  //     connection
-  //   });
-  //   entityPdaRef.current = addEntity.entityPda;
-  //   console.log("entityPda", addEntity.entityPda.toBase58());
-
-  //   // add position component to entity
-  //   const initPositionComponent = await InitializeComponent({
-  //     payer: session.current?.signer.publicKey as PublicKey,
-  //     entity: addEntity.entityPda,
-  //     componentId: positionComponent.programId
-  //   });
-
-  //   // movement system
-  //   const applyMovementSystem = await ApplySystem({
-  //     authority: session.current?.signer.publicKey as PublicKey,
-  //     systemId: movementSystem.programId,
-  //     world: worldPda,
-  //     session: session.current as Session,
-  //     entities: [{
-  //       entity: addEntity.entityPda,
-  //       components: [{ componentId: positionComponent.programId }],
-  //     }]
-  //   });
-
-  //   // add both instruction to one transaction
-  //   const transaction = new Transaction().add(
-  //     addEntity.instruction,
-  //     initPositionComponent.instruction,
-  //     applyMovementSystem.instruction
-  //   );
-  //   // send transaction    
-  //   const signature = await submitTransaction(transaction);
-  //   console.log("🚀 ~ createGame ~ result:", signature);
-  //   subscribPosition();
-
-  // }, [publicKey, createSession, connection, positionComponent.programId, movementSystem.programId, submitTransaction, subscribPosition]);
-
-
-  // const handlePositionChange = useCallback(async () => {
-  //   if (!publicKey) return;
-  //   if (!entityPdaRef.current) return;
-  //   // movement system
-  //   const applyMovementSystem = await ApplySystem({
-  //     authority: session.current?.signer.publicKey as PublicKey,
-  //     systemId: movementSystem.programId,
-  //     world: WORLD_PDA,
-  //     session: session.current as Session,
-  //     entities: [{
-  //       entity: entityPdaRef.current,
-  //       components: [{ componentId: positionComponent.programId }],
-  //     }]
-  //   });
-
-  //   // submitTransaction(applyMovementSystem.transaction);
-  //   const signature = await connection.sendTransaction(applyMovementSystem.transaction, [session.current?.signer as Signer]);
-  //   console.log(signature);
-  // }, [publicKey, movementSystem.programId, positionComponent.programId, connection]);
-
-  // useEffect(() => {
-  //   if (!publicKey) return;
-  //   connection.onAccountChange(publicKey, (accountInfo) => {
-  //     console.log("~ accountInfo:", accountInfo);
-  //   })
-  // }, [connection, publicKey]);
+  }, [connection, createSession, initMapSystemProgram.programId, initPlayerSystemProgram.programId, initPrizepoolSystemProgram.programId, mapComponentProgram.programId, minerWarProgram.programId, playerComponentProgram.programId, playerKey, session]);
 
   const getGames = useCallback(async () => {
-    const [gamesPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("games")],
-      minerWarProgram.programId
-    );
+    const [gamesPda] = PublicKey.findProgramAddressSync([Buffer.from("games")], minerWarProgram.programId);
     minerWarProgram.account.games.fetch(gamesPda).then(games => {
+      console.log("🚀 ~ minerWarProgram.account.games.fetch ~ games:", games)
       const data = games.list.map(game => ({
         id: game.id,
         name: game.name,
@@ -204,18 +113,16 @@ function App() {
     });
   }, [minerWarProgram]);
 
-  const handleClick = useCallback(async (id: number) => {
-    setList(list => list.map(item => item.id === id ? { ...item, loading: true, } : item));
+  const handleRemove = useCallback(async (id: number) => {
     await createSession();
-    const [gamesPda] = PublicKey.findProgramAddressSync(
-      [Buffer.from("games")],
-      minerWarProgram.programId
-    );
+    const signer = session.current?.signer as Signer;
+    setList(list => list.map(item => item.id === id ? { ...item, loading: true, } : item));
+    const [gamesPda] = PublicKey.findProgramAddressSync([Buffer.from("games")], minerWarProgram.programId);
     const tx = await minerWarProgram.methods
       .removeGame(id)
       .accounts({ payer: playerKey, games: gamesPda })
       .transaction();
-    const sn = await connection.sendTransaction(tx, [session.current?.signer as Signer]);
+    const sn = await connection.sendTransaction(tx, [signer]);
     await connection.confirmTransaction(sn, "confirmed");
     await getGames();
   }, [createSession, minerWarProgram, playerKey, connection, session, getGames]);
@@ -242,7 +149,7 @@ function App() {
             <TableHead>NAME</TableHead>
             <TableHead>OWNER</TableHead>
             <TableHead>STATUS</TableHead>
-            <TableHead className="w-[150px] text-right">OPTIONS</TableHead>
+            <TableHead className="text-right">OPTIONS</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -252,9 +159,10 @@ function App() {
               <TableCell>{game.name}</TableCell>
               <TableCell>{game.owner}</TableCell>
               <TableCell>{game.status}</TableCell>
-              <TableCell className="w-[150px] text-right">
+              <TableCell className="text-right">
+                <Button size="sm" variant="outline" disabled={game.owner !== playerKey.toBase58()} onClick={() => handleGameInit(game.id)}>Init</Button>
                 <Button className='ml-2' size="sm">Join</Button>
-                <Button className='ml-2' onClick={() => handleClick(game.id)} size="sm" variant="destructive" disabled={game.owner !== playerKey.toBase58() || game.loading}>{game.loading ? "Closing" : "Close"}</Button>
+                <Button className='ml-2' onClick={() => handleRemove(game.id)} size="sm" variant="destructive" disabled={game.owner !== playerKey.toBase58() || game.loading}>{game.loading ? "Closing" : "Close"}</Button>
               </TableCell>
             </TableRow>
           ))}

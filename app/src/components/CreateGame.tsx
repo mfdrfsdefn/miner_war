@@ -11,16 +11,16 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useSession } from "@/hooks/useSession";
-import { AddEntity, InitializeNewWorld } from "@magicblock-labs/bolt-sdk";
+import { useSessionWallet } from "@/hooks/useSessionWallet";
+import { InitializeNewWorld } from "@magicblock-labs/bolt-sdk";
 import { WalletNotConnectedError } from "@solana/wallet-adapter-base";
-import type { Signer } from "@solana/web3.js";
+import { type Signer } from "@solana/web3.js";
 import { useCallback, useRef, useState } from "react";
 
 export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
   const [gameName, setGameName] = useState("");
   const dialogCloseRef = useRef<HTMLButtonElement | null>(null);
-  const { createSession, playerKey, connection, publicKey, session, minerWarProgram } = useSession();
+  const { createSession, playerKey, connection, publicKey, session, minerWarProgram } = useSessionWallet();
   const [createGameLoading, setCreateGameLoading] = useState(false);
 
   const createGame = useCallback(async () => {
@@ -29,22 +29,18 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
     try {
       // 创建session
       await createSession();
-      console.log("~ createGame ~ session:", session.current?.sessionToken.toBase58());
+
       // 创建游戏世界
       const signer = session.current?.signer as Signer;
       const initNewWorld = await InitializeNewWorld({ payer: playerKey, connection });
-      const initWorldSn = await connection.sendTransaction(initNewWorld.transaction, [signer]);
-      await connection.confirmTransaction(initWorldSn, "confirmed");
-      console.log("🚀 ~ createGame ~ initNewWorld:", initNewWorld.worldId.toNumber(), initNewWorld.worldPda.toBase58());
-      // 创建实体
-      const addEntity = await AddEntity({ payer: playerKey, world: initNewWorld.worldPda, connection });
-      console.log("🚀 ~ createGame ~ addEntity:", addEntity.entityPda.toBase58());
-      // 初始化游戏
-      const tx = await minerWarProgram.methods
+      // 添加到游戏列表
+      const newGameTx = await minerWarProgram.methods
         .newGame(initNewWorld.worldId.toNumber(), gameName, playerKey)
         .accounts({ payer: playerKey })
         .transaction();
-      const initGameSn = await connection.sendTransaction(tx, [signer]);
+
+      newGameTx.add(initNewWorld.transaction);
+      const initGameSn = await connection.sendTransaction(newGameTx, [signer]);
       await connection.confirmTransaction(initGameSn, "confirmed");
       setCreateGameLoading(false);
       getGames();
@@ -53,7 +49,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
       setCreateGameLoading(false);
     }
     dialogCloseRef.current?.click();
-  }, [connection, createSession, gameName, getGames, minerWarProgram.methods, playerKey, session]);
+  }, [playerKey, createSession, session, connection, minerWarProgram.methods, gameName, getGames]);
 
   return (
     <Dialog>
