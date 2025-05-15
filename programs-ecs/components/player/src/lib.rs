@@ -28,7 +28,7 @@ impl Default for Player {
             map: None,
             reward_account: None,
             mine_amount: 0,
-            mining_speed: 0,
+            mining_speed: 1,
             weapon_amount: 0,
             can_attack: true,
             cool_down: 0,
