@@ -22,8 +22,8 @@ import { type PayEntry } from "../../../target/types/pay_entry";
 
 import minerWarIdl from "../../../target/idl/miner_war.json";
 import mapIdl from "../../../target/idl/map.json";
-import playerIdl from "../../../target/idl/map.json";
-import prizepollIdl from "../../../target/idl/map.json";
+import playerIdl from "../../../target/idl/player.json";
+import prizepollIdl from "../../../target/idl/prizepool.json";
 
 import initMapIdl from "../../../target/idl/init_map.json";
 import initPlayerIdl from "../../../target/idl/init_player.json";
@@ -34,7 +34,7 @@ import initMineIdl from "../../../target/idl/mine.json";
 import initPayEntryIdl from "../../../target/idl/pay_entry.json";
 
 function deriveSeedFromPublicKey(userPublicKey: PublicKey): Uint8Array {
-  const salt = 'minerwarSalt';
+  const salt = 'minerwarSalt_1';
   const hash = SHA256(userPublicKey.toBuffer().toString() + salt);
   const hashArray = new Uint8Array(Buffer.from(hash.toString(enc.Hex), 'hex'));
   return hashArray.slice(0, 32);
@@ -61,7 +61,7 @@ export function useSessionWallet() {
 
   const mapComponentProgram: Program<Map> = useMemo(() => new Program(mapIdl, provider), [provider]);
   const playerComponentProgram: Program<Player> = useMemo(() => new Program(playerIdl, provider), [provider]);
-  const prizepollComponentProgram: Program<Prizepool> = useMemo(() => new Program(prizepollIdl, provider), [provider]);
+  const prizepoolComponentProgram: Program<Prizepool> = useMemo(() => new Program(prizepollIdl, provider), [provider]);
 
   const initMapSystemProgram: Program<InitMap> = useMemo(() => new Program(initMapIdl, provider), [provider]);
   const initPlayerSystemProgram: Program<InitPlayer> = useMemo(() => new Program(initPlayerIdl, provider), [provider]);
@@ -137,7 +137,7 @@ export function useSessionWallet() {
     minerWarProgram,
     mapComponentProgram,
     playerComponentProgram,
-    prizepollComponentProgram,
+    prizepoolComponentProgram,
     // system
     initMapSystemProgram,
     initPlayerSystemProgram,

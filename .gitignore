@@ -6,4 +6,4 @@ target
 node_modules
 test-ledger
 .yarn
-yarn.lock
+**/*yarn.lock

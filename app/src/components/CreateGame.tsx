@@ -12,36 +12,145 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useSessionWallet } from "@/hooks/useSessionWallet";
-import { InitializeNewWorld } from "@magicblock-labs/bolt-sdk";
+import { AddEntity, ApplySystem, InitializeComponent, InitializeNewWorld, Session } from "@magicblock-labs/bolt-sdk";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { WalletNotConnectedError } from "@solana/wallet-adapter-base";
-import { type Signer } from "@solana/web3.js";
+import { PublicKey, Transaction, type Signer } from "@solana/web3.js";
 import { useCallback, useRef, useState } from "react";
 
 export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
   const [gameName, setGameName] = useState("");
+  const [tokenMintAdrees, setTokenMintAdress] = useState("AsoX43Q5Y87RPRGFkkYUvu8CSksD9JXNEqWVGVsr8UEp");
   const dialogCloseRef = useRef<HTMLButtonElement | null>(null);
-  const { createSession, playerKey, connection, publicKey, session, minerWarProgram } = useSessionWallet();
+  const { createSession, playerKey, connection, publicKey, session, minerWarProgram, mapComponentProgram, initPrizepoolSystemProgram, initMapSystemProgram, initPlayerSystemProgram, playerComponentProgram, initCashOutSystemProgram, prizepoolComponentProgram } = useSessionWallet();
   const [createGameLoading, setCreateGameLoading] = useState(false);
 
   const createGame = useCallback(async () => {
+    if (gameName.length === 0) throw new Error("Game name is required");
     if (!playerKey) throw new WalletNotConnectedError();
+    if (!tokenMintAdrees) throw new Error("Token mint address is required");
+    const tokenMintInfo = await connection.getAccountInfo(new PublicKey(tokenMintAdrees));
+    if (!tokenMintInfo) throw new Error("Token mint not found");
     setCreateGameLoading(true);
     try {
       // 创建session
       await createSession();
-
       // 创建游戏世界
       const signer = session.current?.signer as Signer;
-      const initNewWorld = await InitializeNewWorld({ payer: playerKey, connection });
+      const initWorld = await InitializeNewWorld({ payer: playerKey, connection });
+      const worldPda = initWorld.worldPda;
+      const initGameSn = await connection.sendTransaction(initWorld.transaction, [signer]);
+      await connection.confirmTransaction(initGameSn, "confirmed");
+      // 初始化地图
+      const mapSeed = new Uint8Array(Buffer.from("map"));
+      const mapEntity = await AddEntity({ payer: playerKey, world: worldPda, seed: mapSeed, connection });
+      const mapComponent = await InitializeComponent({
+        payer: playerKey,
+        entity: mapEntity.entityPda,
+        componentId: mapComponentProgram.programId
+      });
+      const initMapSystem = await ApplySystem({
+        authority: playerKey,
+        world: worldPda,
+        systemId: initMapSystemProgram.programId,
+        session: session.current as Session,
+        entities: [{
+          entity: mapEntity.entityPda,
+          components: [{ componentId: mapComponentProgram.programId }]
+        }],
+        args: { buy_in: 100.0 }
+      });
+      const mapTx = new Transaction().add(mapEntity.instruction, mapComponent.instruction, initMapSystem.instruction);
+      const mapSn = await connection.sendTransaction(mapTx, [signer]);
+      await connection.confirmTransaction(mapSn, "confirmed");
+      console.log("init map success");
+
+      // 初始化玩家
+      const players = ['player1', 'player2'];
+      const playerTx = new Transaction();
+      await Promise.all(players.map(async (player) => {
+        const playerSeed = new Uint8Array(Buffer.from(player));
+        const playerEntity = await AddEntity({
+          payer: playerKey,
+          world: worldPda,
+          seed: playerSeed,
+          connection
+        });
+        const playerComponent = await InitializeComponent({
+          payer: playerKey,
+          entity: playerEntity.entityPda,
+          componentId: playerComponentProgram.programId
+        });
+        const initPlayerSystem = await ApplySystem({
+          authority: playerKey,
+          world: worldPda,
+          systemId: initPlayerSystemProgram.programId,
+          session: session.current as Session,
+          entities: [{
+            entity: playerEntity.entityPda,
+            components: [{ componentId: playerComponentProgram.programId }]
+          }, {
+            entity: mapEntity.entityPda,
+            components: [{ componentId: mapComponentProgram.programId }]
+          }]
+        });
+        playerTx.add(playerEntity.instruction, playerComponent.instruction, initPlayerSystem.instruction);
+      }));
+      const playerSn = await connection.sendTransaction(playerTx, [signer]);
+      await connection.confirmTransaction(playerSn, "confirmed");
+      console.log("init players success");
+
+      // 初始化奖池
+      const prizepoolTx = new Transaction();
+      const prizepoolSeed = new Uint8Array(Buffer.from("prizepool"));
+      const prizepoolEntity = await AddEntity({ payer: playerKey, world: worldPda, seed: prizepoolSeed, connection });
+      const prizepoolComponent = await InitializeComponent({ payer: playerKey, entity: prizepoolEntity.entityPda, componentId: prizepoolComponentProgram.programId });
+
+      const decimals = 9;
+      const mint_of_token = new PublicKey(tokenMintAdrees);
+      const vault_program_id = initCashOutSystemProgram.programId;
+      const mapComponentPdaBuffer = mapComponent.componentPda.toBuffer();
+      const [tokenAccountOwnerPda] = PublicKey.findProgramAddressSync([Buffer.from("token_account_owner_pda"), mapComponentPdaBuffer], vault_program_id);
+      const tokenVault = await getAssociatedTokenAddress(mint_of_token, tokenAccountOwnerPda, true);
+      const owner_token_account = await getAssociatedTokenAddress(mint_of_token, publicKey!);
+
+      const initPrizepoolSystem = await ApplySystem({
+        authority: playerKey,
+        world: worldPda,
+        systemId: initPrizepoolSystemProgram.programId,
+        session: session.current as Session,
+        entities: [
+          {
+            entity: prizepoolEntity.entityPda,
+            components: [{ componentId: prizepoolComponentProgram.programId }],
+          },
+          {
+            entity: mapEntity.entityPda,
+            components: [{ componentId: mapComponentProgram.programId }],
+          },
+        ],
+        args: {
+          vault_token_account_string: tokenVault.toString(),
+          token_string: mint_of_token.toString(),
+          token_decimals: decimals,
+          gamecreater_wallet_string: owner_token_account.toString(),
+        }
+      });
+
+      prizepoolTx.add(prizepoolEntity.transaction, prizepoolComponent.transaction, initPrizepoolSystem.transaction);
+      const prizepoolSn = await connection.sendTransaction(prizepoolTx, [signer]);
+      await connection.confirmTransaction(prizepoolSn, "confirmed");
+      console.log("init prizepool success");
+
       // 添加到游戏列表
       const newGameTx = await minerWarProgram.methods
-        .newGame(initNewWorld.worldId.toNumber(), gameName, playerKey)
+        .newGame(initWorld.worldId.toNumber(), gameName, playerKey)
         .accounts({ payer: playerKey })
         .transaction();
+      const newGameSn = await connection.sendTransaction(newGameTx, [signer]);
+      await connection.confirmTransaction(newGameSn, "confirmed");
+      console.log("init game success");
 
-      newGameTx.add(initNewWorld.transaction);
-      const initGameSn = await connection.sendTransaction(newGameTx, [signer]);
-      await connection.confirmTransaction(initGameSn, "confirmed");
       setCreateGameLoading(false);
       getGames();
     } catch (error) {
@@ -49,7 +158,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
       setCreateGameLoading(false);
     }
     dialogCloseRef.current?.click();
-  }, [playerKey, createSession, session, connection, minerWarProgram.methods, gameName, getGames]);
+  }, [playerKey, createSession, session, connection, mapComponentProgram.programId, initMapSystemProgram.programId, minerWarProgram.methods, tokenMintAdrees, initCashOutSystemProgram.programId, publicKey, initPrizepoolSystemProgram.programId, prizepoolComponentProgram.programId, gameName, getGames, initPlayerSystemProgram.programId, playerComponentProgram.programId]);
 
   return (
     <Dialog>
@@ -67,6 +176,12 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
               Game Name
             </Label>
             <Input id="game_name" placeholder="Input Game Name" required value={gameName} className="col-span-4" onChange={(e) => setGameName(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="username" className="text-right">
+              Token Mint
+            </Label>
+            <Input id="game_owner" value={tokenMintAdrees} onChange={(e) => setTokenMintAdress(e.target.value)} className="col-span-4" />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="username" className="text-right">
