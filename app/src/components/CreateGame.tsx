@@ -22,7 +22,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
   const [gameName, setGameName] = useState("");
   const [tokenMintAdrees, setTokenMintAdress] = useState("AsoX43Q5Y87RPRGFkkYUvu8CSksD9JXNEqWVGVsr8UEp");
   const dialogCloseRef = useRef<HTMLButtonElement | null>(null);
-  const { createSession, playerKey, connection, publicKey, session, minerWarProgram, mapComponentProgram, initPrizepoolSystemProgram, initMapSystemProgram, initPlayerSystemProgram, playerComponentProgram, initCashOutSystemProgram, prizepoolComponentProgram } = useSessionWallet();
+  const { createSession, playerKey, connection, publicKey, session, minerWarProgram, mapComponentProgram, initPrizepoolSystemProgram, initMapSystemProgram, initPlayerSystemProgram, playerComponentProgram, cashOutSystemProgram, prizepoolComponentProgram } = useSessionWallet();
   const [createGameLoading, setCreateGameLoading] = useState(false);
 
   const createGame = useCallback(async () => {
@@ -108,7 +108,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
 
       const decimals = 9;
       const mint_of_token = new PublicKey(tokenMintAdrees);
-      const vault_program_id = initCashOutSystemProgram.programId;
+      const vault_program_id = cashOutSystemProgram.programId;
       const mapComponentPdaBuffer = mapComponent.componentPda.toBuffer();
       const [tokenAccountOwnerPda] = PublicKey.findProgramAddressSync([Buffer.from("token_account_owner_pda"), mapComponentPdaBuffer], vault_program_id);
       const tokenVault = await getAssociatedTokenAddress(mint_of_token, tokenAccountOwnerPda, true);
@@ -158,7 +158,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
       setCreateGameLoading(false);
     }
     dialogCloseRef.current?.click();
-  }, [playerKey, createSession, session, connection, mapComponentProgram.programId, initMapSystemProgram.programId, minerWarProgram.methods, tokenMintAdrees, initCashOutSystemProgram.programId, publicKey, initPrizepoolSystemProgram.programId, prizepoolComponentProgram.programId, gameName, getGames, initPlayerSystemProgram.programId, playerComponentProgram.programId]);
+  }, [gameName, playerKey, tokenMintAdrees, connection, createSession, session, mapComponentProgram.programId, initMapSystemProgram.programId, prizepoolComponentProgram.programId, cashOutSystemProgram.programId, publicKey, initPrizepoolSystemProgram.programId, minerWarProgram.methods, getGames, playerComponentProgram.programId, initPlayerSystemProgram.programId]);
 
   return (
     <Dialog>

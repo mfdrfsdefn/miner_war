@@ -28,10 +28,10 @@ import prizepollIdl from "../../../target/idl/prizepool.json";
 import initMapIdl from "../../../target/idl/init_map.json";
 import initPlayerIdl from "../../../target/idl/init_player.json";
 import initPrizepoolIdl from "../../../target/idl/init_prizepool.json";
-import initCashOutIdl from "../../../target/idl/cash_out.json";
-import initBattleIdl from "../../../target/idl/battle.json";
-import initMineIdl from "../../../target/idl/mine.json";
-import initPayEntryIdl from "../../../target/idl/pay_entry.json";
+import cashOutIdl from "../../../target/idl/cash_out.json";
+import battleIdl from "../../../target/idl/battle.json";
+import mineIdl from "../../../target/idl/mine.json";
+import payEntryIdl from "../../../target/idl/pay_entry.json";
 
 function deriveSeedFromPublicKey(userPublicKey: PublicKey): Uint8Array {
   const salt = 'minerwarSalt_1';
@@ -66,10 +66,10 @@ export function useSessionWallet() {
   const initMapSystemProgram: Program<InitMap> = useMemo(() => new Program(initMapIdl, provider), [provider]);
   const initPlayerSystemProgram: Program<InitPlayer> = useMemo(() => new Program(initPlayerIdl, provider), [provider]);
   const initPrizepoolSystemProgram: Program<InitPrizepool> = useMemo(() => new Program(initPrizepoolIdl, provider), [provider]);
-  const initCashOutSystemProgram: Program<CashOut> = useMemo(() => new Program(initCashOutIdl, provider), [provider]);
-  const initBattleSystemProgram: Program<Battle> = useMemo(() => new Program(initBattleIdl, provider), [provider]);
-  const initMineSystemProgram: Program<Mine> = useMemo(() => new Program(initMineIdl, provider), [provider]);
-  const initPayEntrySystemProgram: Program<PayEntry> = useMemo(() => new Program(initPayEntryIdl, provider), [provider]);
+  const cashOutSystemProgram: Program<CashOut> = useMemo(() => new Program(cashOutIdl, provider), [provider]);
+  const battleSystemProgram: Program<Battle> = useMemo(() => new Program(battleIdl, provider), [provider]);
+  const mineSystemProgram: Program<Mine> = useMemo(() => new Program(mineIdl, provider), [provider]);
+  const payEntrySystemProgram: Program<PayEntry> = useMemo(() => new Program(payEntryIdl, provider), [provider]);
 
   type CreateSessionData = {
     sessionSigner?: Keypair;
@@ -142,9 +142,9 @@ export function useSessionWallet() {
     initMapSystemProgram,
     initPlayerSystemProgram,
     initPrizepoolSystemProgram,
-    initCashOutSystemProgram,
-    initBattleSystemProgram,
-    initMineSystemProgram,
-    initPayEntrySystemProgram,
+    cashOutSystemProgram,
+    battleSystemProgram,
+    mineSystemProgram,
+    payEntrySystemProgram,
   }
 }
