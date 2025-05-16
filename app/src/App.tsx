@@ -2,7 +2,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { CreateGame } from './components/CreateGame';
 import { useSessionWallet } from './hooks/useSessionWallet';
 import { useCallback, useEffect, useState } from 'react';
-import { PublicKey, type Signer } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Transaction, type Signer } from '@solana/web3.js';
 
 import {
   Table,
@@ -14,8 +14,10 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Button } from './components/ui/button';
-import { AddEntity, ApplySystem, FindEntityPda, FindWorldPda, InitializeComponent, Session } from '@magicblock-labs/bolt-sdk';
+import { AddEntity, ApplySystem, FindComponentPda, FindEntityPda, FindWorldPda, InitializeComponent } from '@magicblock-labs/bolt-sdk';
 import { BN } from 'bn.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
 
 interface Game {
   id: number;
@@ -25,24 +27,38 @@ interface Game {
   loading: boolean;
 }
 function App() {
-  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram } = useSessionWallet();
+  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction } = useSessionWallet();
   const [list, setList] = useState<Game[]>([]);
 
   const handlePlay = useCallback(async (id: number) => {
+    if (!publicKey) throw new WalletNotConnectedError();
     await createSession();
-
+    const signer = session.current?.signer as Signer;
     const worldPda = FindWorldPda({ worldId: new BN(id) });
     const mapSeed = new Uint8Array(Buffer.from("map"));
     const mapEntityPda = FindEntityPda({ worldId: new BN(id), seed: mapSeed });
     const prizepoolSeed = new Uint8Array(Buffer.from("prizepool"));
     const prizepoolEntityPda = FindEntityPda({ worldId: new BN(id), seed: prizepoolSeed });
+    const prizepoolComponentPda = FindComponentPda({ entity: prizepoolEntityPda, componentId: prizepoolComponentProgram.programId });
+
     const playerEntity = await AddEntity({ payer: playerKey, world: worldPda, connection });
-    const playerComponent = await InitializeComponent({ payer: playerKey, entity: playerEntity.entityPda, componentId: playerComponentProgram.programId });
+    const playerEntityPda = playerEntity.entityPda;
+    const playerComponent = await InitializeComponent({ payer: playerKey, entity: playerEntityPda, componentId: playerComponentProgram.programId });
+
+    const playerTx = new Transaction();
+    playerTx.add(playerEntity.transaction, playerComponent.transaction);
+    const playerSn = await connection.sendTransaction(playerTx, [signer]);
+    await connection.confirmTransaction(playerSn, "confirmed");
+
+    const prizepoolInfo = await connection.getAccountInfo(prizepoolComponentPda);
+    const prizepoolData = prizepoolComponentProgram.coder.accounts.decode("prizepool", prizepoolInfo!.data);
+    const vault_token_account = prizepoolData.vaultTokenAccount;
+    const payout_token_account = await getAssociatedTokenAddress(prizepoolData.token, publicKey);
+
     const payEntrySystem = await ApplySystem({
-      authority: playerKey,
+      authority: publicKey,
       world: worldPda,
       systemId: payEntrySystemProgram.programId,
-      session: session.current as Session,
       entities: [
         {
           entity: mapEntityPda,
@@ -53,19 +69,50 @@ function App() {
           components: [{ componentId: prizepoolComponentProgram.programId }],
         },
         {
-          entity: playerEntity.entityPda,
+          entity: playerEntityPda,
           components: [{ componentId: playerComponentProgram.programId }],
         }
       ],
       extraAccounts: [
-        // {
-        //   pubkey: playerEntity.entityPda,
-        //   isWritable: true,
-        //   isSigner: false,
-        // },
+        {
+          pubkey: vault_token_account,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: playerKey,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: payout_token_account,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: publicKey,
+          isWritable: true,
+          isSigner: false,
+        },
+        {
+          pubkey: SystemProgram.programId,
+          isWritable: false,
+          isSigner: false,
+        },
+        {
+          pubkey: TOKEN_PROGRAM_ID,
+          isWritable: false,
+          isSigner: false,
+        }
       ]
-    })
-  }, [connection, createSession, mapComponentProgram.programId, payEntrySystemProgram.programId, playerComponentProgram.programId, playerKey, prizepoolComponentProgram.programId, session]);
+    });
+
+    const payEntrySn = await sendTransaction(payEntrySystem.transaction, connection);
+    await connection.confirmTransaction(payEntrySn, "confirmed");
+
+    console.log("init join game success");
+
+  }, [connection, createSession, mapComponentProgram.programId, payEntrySystemProgram.programId, playerComponentProgram.programId, playerKey, prizepoolComponentProgram.coder.accounts, prizepoolComponentProgram.programId, publicKey, sendTransaction, session]);
 
   const getGames = useCallback(async () => {
     const [gamesPda] = PublicKey.findProgramAddressSync([Buffer.from("games")], minerWarProgram.programId);

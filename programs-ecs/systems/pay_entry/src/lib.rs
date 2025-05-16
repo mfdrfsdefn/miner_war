@@ -39,7 +39,11 @@ pub mod pay_entry {
     pub fn execute(ctx: Context<Components>, _args: Vec<u8>) -> Result<Components> {
         let buy_in: f64 = ctx.accounts.map.buy_in;
         require!(
-            ctx.accounts.prizepool.map == ctx.accounts.player.map,
+            ctx.accounts
+                .prizepool
+                .map
+                .expect("Prizepool map key not set")
+                == ctx.accounts.map.key(),
             Error::MapKeyMismatch
         );
         require!(ctx.accounts.player.mine_amount == 0, Error::AlreadyInGame);
@@ -55,11 +59,12 @@ pub mod pay_entry {
                 == ctx.vault_token_account()?.key(),
             Error::InvalidGameVault
         );
+        msg!(ctx.vault_token_account()?.key().to_string().as_str());
 
         let vault_token_account: TokenAccount = TokenAccount::try_deserialize_unchecked(
             &mut (ctx.vault_token_account()?.to_account_info().data.borrow()).as_ref(),
         )?;
-        let exit_pid: Pubkey = pubkey!("A4qZibJ3rUGd9izgHXX5tapbRbhbT7Xu8u29RzKsuTp8"); //cash-out program id
+        let exit_pid: Pubkey = pubkey!("5Na7qMLrgu24ACdb5zeGqpzWw2GgZQ2fVS8XxKv3d7r5"); //cash-out program id
         let map_pubkey = ctx
             .accounts
             .prizepool
@@ -73,12 +78,7 @@ pub mod pay_entry {
             Error::InvalidGameVaultOwner
         );
         require!(
-            vault_token_account.mint
-                == ctx
-                    .accounts
-                    .prizepool
-                    .vault_token_account
-                    .expect("Vault mint not set"),
+            vault_token_account.mint == ctx.accounts.prizepool.token.expect("Vault mint not set"),
             Error::InvalidMint
         );
 
@@ -139,6 +139,5 @@ pub mod pay_entry {
         signer: Signer<'info>,
         system_program: Program<'info, System>,
         token_program: Program<'info, Token>,
-        rent: Sysvar<'info, Rent>,
     }
 }
