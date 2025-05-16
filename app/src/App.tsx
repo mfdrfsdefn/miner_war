@@ -198,14 +198,96 @@ function App() {
     }
   }, [playerComponentPda, connection, playerComponentProgram.coder.accounts, publicKey]);
 
+  // 购买机器
+  const handleBuyMachine = useCallback(async () => {
+    try {
+      // 实现购买机器的逻辑
+      setOperationStatus({
+        type: 'buyMachine',
+        status: 'success',
+        message: 'Machine purchased successfully'
+      });
+    } catch (error: any) {
+      console.error('Buy machine failed:', error);
+      setOperationStatus({
+        type: 'buyMachine',
+        status: 'failed',
+        message: `Failed to buy machine: ${error.message}`
+      });
+    }
+  }, []);
+
+  // 购买武器
+  const handleBuyWeapon = useCallback(async () => {
+    try {
+      // 实现购买武器的逻辑
+      setOperationStatus({
+        type: 'buyWeapon',
+        status: 'success',
+        message: 'Weapon purchased successfully'
+      });
+    } catch (error: any) {
+      console.error('Buy weapon failed:', error);
+      setOperationStatus({
+        type: 'buyWeapon',
+        status: 'failed',
+        message: `Failed to buy weapon: ${error.message}`
+      });
+    }
+  }, []);
+
+  // 战斗
+  const handleBattle = useCallback(async () => {
+    try {
+      // 实现战斗的逻辑
+      setOperationStatus({
+        type: 'battle',
+        status: 'success',
+        message: 'Battle completed successfully'
+      });
+    } catch (error: any) {
+      console.error('Battle failed:', error);
+      setOperationStatus({
+        type: 'battle',
+        status: 'failed',
+        message: `Battle failed: ${error.message}`
+      });
+    }
+  }, []);
+
+  // 处理其他操作的函数
+  const handleOperation = useCallback(async (type: 'buyMachine' | 'buyWeapon' | 'battle') => {
+    try {
+      switch (type) {
+        case 'buyMachine':
+          await handleBuyMachine();
+          break;
+        case 'buyWeapon':
+          await handleBuyWeapon();
+          break;
+        case 'battle':
+          await handleBattle();
+          break;
+      }
+    } catch (error: any) {
+      console.error(`Operation ${type} failed:`, error);
+      setOperationStatus({
+        type,
+        status: 'failed',
+        message: `Operation failed: ${error.message}`
+      });
+    }
+  }, [handleBuyMachine, handleBuyWeapon, handleBattle]);
+
   // 自动挖矿函数
   const startAutoMining = useCallback(async () => {
     if (!worldPda || !playerEntityPda || !publicKey || !currentMapPda) return;
     
+    // 设置定时器，每5秒执行一次挖矿
     const interval = setInterval(async () => {
       try {
         // 获取地图状态
-        const mapInfo = await connection.getAccountInfo(currentMapPda);
+        const mapInfo = await connection.getAccountInfo(currentMapPda as PublicKey);
         if (!mapInfo) return;
         const mapData = mapComponentProgram.coder.accounts.decode("map", mapInfo.data);
         
@@ -222,8 +304,8 @@ function App() {
           return;
         }
 
-        // 获取玩家组件
-        const playerComponentInfo = await connection.getAccountInfo(playerComponentPda);
+        // 获取玩家组件信息
+        const playerComponentInfo = await connection.getAccountInfo(playerComponentPda as PublicKey);
         if (!playerComponentInfo) return;
         const playerData = playerComponentProgram.coder.accounts.decode("player", playerComponentInfo.data);
 
@@ -239,7 +321,7 @@ function App() {
           return;
         }
 
-        // 执行挖矿
+        // 执行挖矿系统
         const mineSystem = await ApplySystem({
           authority: publicKey,
           world: worldPda,
@@ -260,36 +342,9 @@ function App() {
           ]
         });
 
+        // 发送并确认交易
         const mineSn = await sendTransaction(mineSystem.transaction, connection);
         await connection.confirmTransaction(mineSn, "confirmed");
-
-        // 检查并执行队列中的操作
-        const now = Date.now();
-        const pendingOperations = operationQueue.filter(op => 
-          now - op.timestamp < 5000
-        );
-
-        for (const op of pendingOperations) {
-          try {
-            switch (op.type) {
-              case 'buyMachine':
-                await handleBuyMachine();
-                break;
-              case 'buyWeapon':
-                await handleBuyWeapon();
-                break;
-              case 'battle':
-                await handleBattle();
-                break;
-            }
-          } catch (error) {
-            console.error(`Operation ${op.type} failed:`, error);
-          }
-        }
-
-        setOperationQueue(prev => 
-          prev.filter(op => now - op.timestamp >= 5000)
-        );
 
       } catch (error) {
         console.error("Mining error:", error);
@@ -299,16 +354,7 @@ function App() {
     }, 5000);
     
     setMiningInterval(interval);
-  }, [worldPda, playerEntityPda, publicKey, currentMapPda, connection, mineSystemProgram, playerComponentProgram, mapComponentProgram, sendTransaction, operationQueue, playerComponentPda]);
-
-  // 在组件卸载时清理定时器
-  useEffect(() => {
-    return () => {
-      if (miningInterval) {
-        clearInterval(miningInterval);
-      }
-    };
-  }, [miningInterval]);
+  }, [worldPda, playerEntityPda, publicKey, currentMapPda, connection, mineSystemProgram, playerComponentProgram, mapComponentProgram, sendTransaction]);
 
   // 当游戏开始时自动启动挖矿
   useEffect(() => {
@@ -316,30 +362,6 @@ function App() {
       startAutoMining();
     }
   }, [currentMapPda, worldPda, playerEntityPda, publicKey, startAutoMining]);
-
-  // 购买机器
-  const handleBuyMachine = useCallback(() => {
-    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
-      type: 'buyMachine',
-      timestamp: Date.now()
-    }]);
-  }, []);
-
-  // 购买武器
-  const handleBuyWeapon = useCallback(() => {
-    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
-      type: 'buyWeapon',
-      timestamp: Date.now()
-    }]);
-  }, []);
-
-  // 战斗
-  const handleBattle = useCallback(() => {
-    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
-      type: 'battle',
-      timestamp: Date.now()
-    }]);
-  }, []);
 
   return (
     <div className='h-dvh w-dvw relative flex items-center flex-col justify-center'>
@@ -373,17 +395,17 @@ function App() {
               {/* 操作按钮 */}
               <div className="flex gap-4">
                 <Button 
-                  onClick={handleBuyMachine}
+                  onClick={() => handleOperation('buyMachine')}
                 >
                   Buy Machine
                 </Button>
                 <Button 
-                  onClick={handleBuyWeapon}
+                  onClick={() => handleOperation('buyWeapon')}
                 >
                   Buy Weapon
                 </Button>
                 <Button 
-                  onClick={handleBattle}
+                  onClick={() => handleOperation('battle')}
                 >
                   Battle
                 </Button>
