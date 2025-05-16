@@ -28,7 +28,7 @@ pub mod init_map {
     }
 
     #[arguments]
-    struct Args {
+   pub struct Args {
         buy_in: f64,
         
     }

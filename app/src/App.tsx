@@ -27,8 +27,16 @@ interface Game {
   owner: string;
   loading: boolean;
 }
+
+interface PlayerData {
+  mine_amount: number;
+  weapon_amount: number;
+  mining_speed: number;
+  can_attack: boolean;
+}
+
 function App() {
-  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction } = useSessionWallet();
+  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction, mineSystemProgram } = useSessionWallet();
   const [list, setList] = useState<Game[]>([]);
   const [playerComponentPda, setPlayerComponentPda] = useState<PublicKey | void>(() => {
     const pda = localStorage.getItem("playerComponentPda");
@@ -36,6 +44,20 @@ function App() {
   });
 
   const [currentMapPda, setCurrentMapPda] = useState<PublicKey | void>();
+  const [playerData, setPlayerData] = useState<PlayerData | null>(null);
+  const [isMining, setIsMining] = useState(false);
+  const [miningInterval, setMiningInterval] = useState<NodeJS.Timeout | null>(null);
+  const [operationQueue, setOperationQueue] = useState<{
+    type: 'buyMachine' | 'buyWeapon' | 'battle';
+    timestamp: number;
+  }[]>([]);
+  const [operationStatus, setOperationStatus] = useState<{
+    type: string;
+    status: 'pending' | 'success' | 'failed';
+    message: string;
+  } | null>(null);
+  const [worldPda, setWorldPda] = useState<PublicKey | null>(null);
+  const [playerEntityPda, setPlayerEntityPda] = useState<PublicKey | null>(null);
 
   const handlePlay = useCallback(async (id: number) => {
     if (!publicKey) throw new WalletNotConnectedError();
@@ -176,6 +198,149 @@ function App() {
     }
   }, [playerComponentPda, connection, playerComponentProgram.coder.accounts, publicKey]);
 
+  // 自动挖矿函数
+  const startAutoMining = useCallback(async () => {
+    if (!worldPda || !playerEntityPda || !publicKey || !currentMapPda) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        // 获取地图状态
+        const mapInfo = await connection.getAccountInfo(currentMapPda);
+        if (!mapInfo) return;
+        const mapData = mapComponentProgram.coder.accounts.decode("map", mapInfo.data);
+        
+        // 检查游戏状态
+        if (!mapData.isStart) {
+          console.log("Game has not started yet");
+          return;
+        }
+        
+        if (mapData.gameTime >= mapData.totalGameTime) {
+          console.log("Game has finished");
+          clearInterval(interval);
+          setMiningInterval(null);
+          return;
+        }
+
+        // 获取玩家组件
+        const playerComponentInfo = await connection.getAccountInfo(playerComponentPda);
+        if (!playerComponentInfo) return;
+        const playerData = playerComponentProgram.coder.accounts.decode("player", playerComponentInfo.data);
+
+        // 获取另一个玩家的组件
+        const otherPlayerIndex = mapData.players.findIndex((p: PublicKey | null) => p?.toBase58() !== playerData.map?.toBase58());
+        if (otherPlayerIndex === -1) {
+          console.log("Waiting for another player");
+          return;
+        }
+        const otherPlayerPda = mapData.players[otherPlayerIndex];
+        if (!otherPlayerPda) {
+          console.log("Other player not found");
+          return;
+        }
+
+        // 执行挖矿
+        const mineSystem = await ApplySystem({
+          authority: publicKey,
+          world: worldPda,
+          systemId: mineSystemProgram.programId,
+          entities: [
+            {
+              entity: playerEntityPda as PublicKey,
+              components: [{ componentId: playerComponentProgram.programId }],
+            },
+            {
+              entity: otherPlayerPda,
+              components: [{ componentId: playerComponentProgram.programId }],
+            },
+            {
+              entity: currentMapPda as PublicKey,
+              components: [{ componentId: mapComponentProgram.programId }],
+            }
+          ]
+        });
+
+        const mineSn = await sendTransaction(mineSystem.transaction, connection);
+        await connection.confirmTransaction(mineSn, "confirmed");
+
+        // 检查并执行队列中的操作
+        const now = Date.now();
+        const pendingOperations = operationQueue.filter(op => 
+          now - op.timestamp < 5000
+        );
+
+        for (const op of pendingOperations) {
+          try {
+            switch (op.type) {
+              case 'buyMachine':
+                await handleBuyMachine();
+                break;
+              case 'buyWeapon':
+                await handleBuyWeapon();
+                break;
+              case 'battle':
+                await handleBattle();
+                break;
+            }
+          } catch (error) {
+            console.error(`Operation ${op.type} failed:`, error);
+          }
+        }
+
+        setOperationQueue(prev => 
+          prev.filter(op => now - op.timestamp >= 5000)
+        );
+
+      } catch (error) {
+        console.error("Mining error:", error);
+        clearInterval(interval);
+        setMiningInterval(null);
+      }
+    }, 5000);
+    
+    setMiningInterval(interval);
+  }, [worldPda, playerEntityPda, publicKey, currentMapPda, connection, mineSystemProgram, playerComponentProgram, mapComponentProgram, sendTransaction, operationQueue, playerComponentPda]);
+
+  // 在组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (miningInterval) {
+        clearInterval(miningInterval);
+      }
+    };
+  }, [miningInterval]);
+
+  // 当游戏开始时自动启动挖矿
+  useEffect(() => {
+    if (currentMapPda && worldPda && playerEntityPda && publicKey) {
+      startAutoMining();
+    }
+  }, [currentMapPda, worldPda, playerEntityPda, publicKey, startAutoMining]);
+
+  // 购买机器
+  const handleBuyMachine = useCallback(() => {
+    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
+      type: 'buyMachine',
+      timestamp: Date.now()
+    }]);
+  }, []);
+
+  // 购买武器
+  const handleBuyWeapon = useCallback(() => {
+    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
+      type: 'buyWeapon',
+      timestamp: Date.now()
+    }]);
+  }, []);
+
+  // 战斗
+  const handleBattle = useCallback(() => {
+    setOperationQueue((prev: { type: 'buyMachine' | 'buyWeapon' | 'battle'; timestamp: number }[]) => [...prev, {
+      type: 'battle',
+      timestamp: Date.now()
+    }]);
+  }, []);
+
   return (
     <div className='h-dvh w-dvw relative flex items-center flex-col justify-center'>
       <div className="absolute left-4 top-4">
@@ -193,6 +358,58 @@ function App() {
             <span className='ml-2 font-light text-sm'>{currentMapPda.toBase58()}</span>
           </>
         )}
+        
+        {/* 游戏控制面板 */}
+        {!!currentMapPda && (
+          <div className="mt-4 p-4 border rounded-lg">
+            <div className="flex flex-col gap-4">
+              {/* 玩家状态显示 */}
+              <div className="flex gap-4">
+                <div>Mining Amount: {playerData?.mine_amount || 0}</div>
+                <div>Weapon Amount: {playerData?.weapon_amount || 0}</div>
+                <div>Mining Speed: {playerData?.mining_speed || 0}</div>
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-4">
+                <Button 
+                  onClick={handleBuyMachine}
+                >
+                  Buy Machine
+                </Button>
+                <Button 
+                  onClick={handleBuyWeapon}
+                >
+                  Buy Weapon
+                </Button>
+                <Button 
+                  onClick={handleBattle}
+                >
+                  Battle
+                </Button>
+              </div>
+
+              {/* 操作状态显示 */}
+              {operationStatus && (
+                <div className={`p-2 rounded ${
+                  operationStatus.status === 'success' ? 'bg-green-100' :
+                  operationStatus.status === 'failed' ? 'bg-red-100' :
+                  'bg-yellow-100'
+                }`}>
+                  {operationStatus.message}
+                </div>
+              )}
+
+              {/* 操作队列显示 */}
+              {operationQueue.length > 0 && (
+                <div className="text-sm text-gray-500">
+                  Pending Operations: {operationQueue.length}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <Table className='max-w-[1000px] m-auto mt-5'>
           <TableCaption>Game List</TableCaption>
           <TableHeader>
