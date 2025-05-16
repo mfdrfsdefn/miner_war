@@ -2,7 +2,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 import { CreateGame } from './components/CreateGame';
 import { useSessionWallet } from './hooks/useSessionWallet';
 import { useCallback, useEffect, useState } from 'react';
-import { PublicKey, SystemProgram, Transaction, type Signer } from '@solana/web3.js';
+import { PublicKey, SystemProgram, Transaction, type AccountInfo, type Signer } from '@solana/web3.js';
 
 import {
   Table,
@@ -18,6 +18,7 @@ import { AddEntity, ApplySystem, FindComponentPda, FindEntityPda, FindWorldPda, 
 import { BN } from 'bn.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { WalletNotConnectedError } from '@solana/wallet-adapter-base';
+import { cn } from './lib/utils';
 
 interface Game {
   id: number;
@@ -29,6 +30,12 @@ interface Game {
 function App() {
   const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction } = useSessionWallet();
   const [list, setList] = useState<Game[]>([]);
+  const [playerComponentPda, setPlayerComponentPda] = useState<PublicKey | void>(() => {
+    const pda = localStorage.getItem("playerComponentPda");
+    return pda ? new PublicKey(pda) : void 0;
+  });
+
+  const [currentMapPda, setCurrentMapPda] = useState<PublicKey | void>();
 
   const handlePlay = useCallback(async (id: number) => {
     if (!publicKey) throw new WalletNotConnectedError();
@@ -110,7 +117,9 @@ function App() {
     const payEntrySn = await sendTransaction(payEntrySystem.transaction, connection);
     await connection.confirmTransaction(payEntrySn, "confirmed");
 
-    console.log("init join game success");
+    setPlayerComponentPda(playerComponent.componentPda);
+
+    console.log("init pay entry success");
 
   }, [connection, createSession, mapComponentProgram.programId, payEntrySystemProgram.programId, playerComponentProgram.programId, playerKey, prizepoolComponentProgram.coder.accounts, prizepoolComponentProgram.programId, publicKey, sendTransaction, session]);
 
@@ -145,8 +154,27 @@ function App() {
 
   useEffect(() => {
     if (!publicKey) return;
-    getGames()
-  }, [getGames, minerWarProgram, publicKey])
+    getGames();
+  }, [getGames, minerWarProgram, publicKey]);
+
+  useEffect(() => {
+    if (!publicKey) return;
+    if (!playerComponentPda) return;
+    localStorage.setItem("playerComponentPda", playerComponentPda.toBase58());
+    const onChange = (accountInfo: AccountInfo<Buffer<ArrayBufferLike>> | null) => {
+      if (!accountInfo) throw new Error("accountInfo is null");
+      const playerData = playerComponentProgram.coder.accounts.decode("player", accountInfo.data);
+      if (playerData.map?.toBase58()) {
+        setCurrentMapPda(playerData.map);
+      }
+    }
+    connection.getAccountInfo(playerComponentPda).then(onChange);
+    console.log("~ useEffect ~ playerComponentPda:", playerComponentPda);
+    const subscribePlayerComponentPda = connection.onAccountChange(playerComponentPda, onChange);
+    return () => {
+      connection.removeAccountChangeListener(subscribePlayerComponentPda);
+    }
+  }, [playerComponentPda, connection, playerComponentProgram.coder.accounts, publicKey]);
 
   return (
     <div className='h-dvh w-dvw relative flex items-center flex-col justify-center'>
@@ -156,34 +184,42 @@ function App() {
       <div className="absolute top-4 right-4">
         <WalletMultiButton />
       </div>
-      {publicKey && <CreateGame getGames={getGames} />}
-      <Table className='max-w-[1000px] m-auto'>
-        <TableCaption>Game List</TableCaption>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-[80px]">ID</TableHead>
-            <TableHead>NAME</TableHead>
-            <TableHead>OWNER</TableHead>
-            <TableHead>STATUS</TableHead>
-            <TableHead className="text-right">OPTIONS</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {list.map((game) => (
-            <TableRow key={game.id}>
-              <TableCell className="w-[80px]">{game.id}</TableCell>
-              <TableCell>{game.name}</TableCell>
-              <TableCell>{game.owner}</TableCell>
-              <TableCell>{game.status}</TableCell>
-              <TableCell className="text-right">
-                <Button className='ml-2' size="sm" onClick={() => handlePlay(game.id)}>Play</Button>
-                <Button className='ml-2' onClick={() => handleRemove(game.id)} size="sm" variant="destructive" disabled={game.owner !== playerKey.toBase58() || game.loading}>{game.loading ? "Closing" : "Close"}</Button>
-              </TableCell>
+      {/* <div className={cn("w-[720px] h-[480px] outline outline-black", { "hidden": !currentMapPda })}></div> */}
+      <div className={cn("w-[1000px] m-auto", { "hidden": false })}>
+        {publicKey && <CreateGame getGames={getGames} />}
+        {!!currentMapPda && (
+          <>
+            <span>current map: </span>
+            <span className='ml-2 font-light text-sm'>{currentMapPda.toBase58()}</span>
+          </>
+        )}
+        <Table className='max-w-[1000px] m-auto mt-5'>
+          <TableCaption>Game List</TableCaption>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[80px]">ID</TableHead>
+              <TableHead>NAME</TableHead>
+              <TableHead>OWNER</TableHead>
+              <TableHead>STATUS</TableHead>
+              <TableHead className="text-right">OPTIONS</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {/* <div className='w-[1280px] h-[720px] outline outline-black'></div> */}
+          </TableHeader>
+          <TableBody>
+            {list.map((game) => (
+              <TableRow key={game.id}>
+                <TableCell className="w-[80px]">{game.id}</TableCell>
+                <TableCell>{game.name}</TableCell>
+                <TableCell>{game.owner}</TableCell>
+                <TableCell>{game.status}</TableCell>
+                <TableCell className="text-right">
+                  <Button className='ml-2' size="sm" onClick={() => handlePlay(game.id)}>BuyEntry</Button>
+                  <Button className='ml-2' onClick={() => handleRemove(game.id)} size="sm" variant="destructive" disabled={game.owner !== playerKey.toBase58() || game.loading}>{game.loading ? "Closing" : "Close"}</Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

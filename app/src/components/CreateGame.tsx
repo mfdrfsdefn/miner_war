@@ -58,7 +58,7 @@ export function CreateGame({ getGames }: { getGames: () => Promise<void> }) {
           entity: mapEntity.entityPda,
           components: [{ componentId: mapComponentProgram.programId }]
         }],
-        args: { buy_in: 100.0 }
+        args: { buy_in: 1.0 }
       });
       const createGameTx = new Transaction().add(mapEntity.instruction, mapComponent.instruction, initMapSystem.instruction);
 

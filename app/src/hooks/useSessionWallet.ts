@@ -34,7 +34,7 @@ import mineIdl from "../../../target/idl/mine.json";
 import payEntryIdl from "../../../target/idl/pay_entry.json";
 
 function deriveSeedFromPublicKey(userPublicKey: PublicKey): Uint8Array {
-  const salt = 'minerwarSalt_1';
+  const salt = 'minerwarSalt_3';
   const hash = SHA256(userPublicKey.toBuffer().toString() + salt);
   const hashArray = new Uint8Array(Buffer.from(hash.toString(enc.Hex), 'hex'));
   return hashArray.slice(0, 32);
