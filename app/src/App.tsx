@@ -36,7 +36,7 @@ interface PlayerData {
 }
 
 function App() {
-  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction, mineSystemProgram } = useSessionWallet();
+  const { publicKey, connection, playerKey, session, createSession, minerWarProgram, payEntrySystemProgram, mapComponentProgram, gameStartEntrySystemProgram, prizepoolComponentProgram, playerComponentProgram, sendTransaction, mineSystemProgram } = useSessionWallet();
   const [list, setList] = useState<Game[]>([]);
   const [playerComponentPda, setPlayerComponentPda] = useState<PublicKey | void>(() => {
     const pda = localStorage.getItem("playerComponentPda");
@@ -44,6 +44,8 @@ function App() {
   });
 
   const [currentMapPda, setCurrentMapPda] = useState<PublicKey | void>();
+  const [currentMapPdaData, setCurrentMapPdaData] = useState<{ players: (PublicKey | void)[], isStart: boolean }>();
+
   const [playerData, setPlayerData] = useState<PlayerData | null>(null);
   const [isMining, setIsMining] = useState(false);
   const [miningInterval, setMiningInterval] = useState<NodeJS.Timeout | null>(null);
@@ -174,6 +176,17 @@ function App() {
     await getGames();
   }, [createSession, minerWarProgram, playerKey, connection, session, getGames]);
 
+  const handleGameStart = useCallback(async () => {
+    if (!publicKey) throw new WalletNotConnectedError();
+    await createSession();
+    // const gameStartSystem = await ApplySystem({
+    //   authority: playerKey,
+    //   systemId: gameStartEntrySystemProgram.programId,
+    //   entities: [],
+    //   world: PublicKey,
+    // });
+  }, [playerKey, gameStartEntrySystemProgram]);
+
   useEffect(() => {
     if (!publicKey) return;
     getGames();
@@ -184,7 +197,7 @@ function App() {
     if (!playerComponentPda) return;
     localStorage.setItem("playerComponentPda", playerComponentPda.toBase58());
     const onChange = (accountInfo: AccountInfo<Buffer<ArrayBufferLike>> | null) => {
-      if (!accountInfo) throw new Error("accountInfo is null");
+      if (!accountInfo) throw new Error("player accountInfo is null");
       const playerData = playerComponentProgram.coder.accounts.decode("player", accountInfo.data);
       if (playerData.map?.toBase58()) {
         setCurrentMapPda(playerData.map);
@@ -197,6 +210,24 @@ function App() {
       connection.removeAccountChangeListener(subscribePlayerComponentPda);
     }
   }, [playerComponentPda, connection, playerComponentProgram.coder.accounts, publicKey]);
+
+
+  useEffect(() => {
+    if (!currentMapPda || !publicKey) return;
+    const onChange = (accountInfo: AccountInfo<Buffer<ArrayBufferLike>> | null) => {
+      if (!accountInfo) throw new Error("map accountInfo is null");
+      const mapData = mapComponentProgram.coder.accounts.decode("map", accountInfo.data);
+      console.log("🚀 ~ onChange ~ mapData:", mapData)
+      setCurrentMapPdaData(mapData);
+    }
+    connection.getAccountInfo(currentMapPda).then(onChange);
+    console.log("~ useEffect ~ playerComponentPda:", playerComponentPda);
+    const subscribeCurrentMapPda = connection.onAccountChange(currentMapPda, onChange);
+    return () => {
+      connection.removeAccountChangeListener(subscribeCurrentMapPda);
+    }
+  }, [connection, currentMapPda, mapComponentProgram.coder.accounts, playerComponentPda, publicKey])
+
 
   // 购买机器
   const handleBuyMachine = useCallback(async () => {
@@ -282,7 +313,7 @@ function App() {
   // 自动挖矿函数
   const startAutoMining = useCallback(async () => {
     if (!worldPda || !playerEntityPda || !publicKey || !currentMapPda) return;
-    
+
     // 设置定时器，每5秒执行一次挖矿
     const interval = setInterval(async () => {
       try {
@@ -290,13 +321,13 @@ function App() {
         const mapInfo = await connection.getAccountInfo(currentMapPda as PublicKey);
         if (!mapInfo) return;
         const mapData = mapComponentProgram.coder.accounts.decode("map", mapInfo.data);
-        
+
         // 检查游戏状态
         if (!mapData.isStart) {
           console.log("Game has not started yet");
           return;
         }
-        
+
         if (mapData.gameTime >= mapData.totalGameTime) {
           console.log("Game has finished");
           clearInterval(interval);
@@ -352,9 +383,9 @@ function App() {
         setMiningInterval(null);
       }
     }, 5000);
-    
+
     setMiningInterval(interval);
-  }, [worldPda, playerEntityPda, publicKey, currentMapPda, connection, mineSystemProgram, playerComponentProgram, mapComponentProgram, sendTransaction]);
+  }, [worldPda, playerEntityPda, publicKey, currentMapPda, connection, mapComponentProgram.coder.accounts, mapComponentProgram.programId, playerComponentPda, playerComponentProgram.coder.accounts, playerComponentProgram.programId, mineSystemProgram.programId, sendTransaction]);
 
   // 当游戏开始时自动启动挖矿
   useEffect(() => {
@@ -378,9 +409,15 @@ function App() {
           <>
             <span>current map: </span>
             <span className='ml-2 font-light text-sm'>{currentMapPda.toBase58()}</span>
+            {currentMapPdaData && !currentMapPdaData.isStart && (
+              <>
+                {currentMapPdaData?.players.length !== 2 && <span>等待玩家加入...</span>}
+                <Button className='ml-2' onClick={handleGameStart} disabled={currentMapPdaData?.players.length !== 2}>Game start</Button>
+              </>
+            )}
           </>
         )}
-        
+
         {/* 游戏控制面板 */}
         {!!currentMapPda && (
           <div className="mt-4 p-4 border rounded-lg">
@@ -394,17 +431,17 @@ function App() {
 
               {/* 操作按钮 */}
               <div className="flex gap-4">
-                <Button 
+                <Button
                   onClick={() => handleOperation('buyMachine')}
                 >
                   Buy Machine
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleOperation('buyWeapon')}
                 >
                   Buy Weapon
                 </Button>
-                <Button 
+                <Button
                   onClick={() => handleOperation('battle')}
                 >
                   Battle
@@ -413,11 +450,10 @@ function App() {
 
               {/* 操作状态显示 */}
               {operationStatus && (
-                <div className={`p-2 rounded ${
-                  operationStatus.status === 'success' ? 'bg-green-100' :
+                <div className={`p-2 rounded ${operationStatus.status === 'success' ? 'bg-green-100' :
                   operationStatus.status === 'failed' ? 'bg-red-100' :
-                  'bg-yellow-100'
-                }`}>
+                    'bg-yellow-100'
+                  }`}>
                   {operationStatus.message}
                 </div>
               )}

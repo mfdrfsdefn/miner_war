@@ -18,6 +18,7 @@ import { type CashOut } from "../../../target/types/cash_out";
 import { type Battle } from "../../../target/types/battle";
 import { type Mine } from "../../../target/types/mine";
 import { type PayEntry } from "../../../target/types/pay_entry";
+import { type GameStart } from "../../../target/types/game_start";
 
 
 import minerWarIdl from "../../../target/idl/miner_war.json";
@@ -32,6 +33,7 @@ import cashOutIdl from "../../../target/idl/cash_out.json";
 import battleIdl from "../../../target/idl/battle.json";
 import mineIdl from "../../../target/idl/mine.json";
 import payEntryIdl from "../../../target/idl/pay_entry.json";
+import gameStartIdl from "../../../target/idl/game_start.json";
 
 function deriveSeedFromPublicKey(userPublicKey: PublicKey): Uint8Array {
   const salt = 'minerwarSalt_3';
@@ -70,6 +72,7 @@ export function useSessionWallet() {
   const battleSystemProgram: Program<Battle> = useMemo(() => new Program(battleIdl, provider), [provider]);
   const mineSystemProgram: Program<Mine> = useMemo(() => new Program(mineIdl, provider), [provider]);
   const payEntrySystemProgram: Program<PayEntry> = useMemo(() => new Program(payEntryIdl, provider), [provider]);
+  const gameStartEntrySystemProgram: Program<GameStart> = useMemo(() => new Program(gameStartIdl, provider), [provider]);
 
   type CreateSessionData = {
     sessionSigner?: Keypair;
@@ -146,5 +149,6 @@ export function useSessionWallet() {
     battleSystemProgram,
     mineSystemProgram,
     payEntrySystemProgram,
+    gameStartEntrySystemProgram,
   }
 }
